@@ -1,0 +1,110 @@
+---
+title: "Ch1_HW"
+author: "PoMingChen"
+date: "7/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+> 詳細的作業說明，請見「Ch 1.1 - R 語言基礎 -  R 語言的資料型態」。本次作業的目標是：綜合使用使用者自訂函數、流程控制、迴圈控制等方法，進行 R 語言統計分析。我們會在繳交完作業後，傳送正確答案給你！
+
+## 第一題
+
+> 試圖撰寫函數 SummarizeData(data.frame)： 
+- 輸入：名為 data.frame 的資料框架，該函數將計算計算 data.frame 的統計量 0    - 輸出：名為 `output` 的資料框架，`output`  columns 的值依序為 `data.frame` 每個 column 的平均數（`mean`）、變異數（`var`）、最大值（`max`）、最小值（`min`），每個 row 是 `data.frame` 的一個 column 
+利用這個函數，計算 iris 資料集合前四個 columns 的各項統計量。
+
+```{r }
+
+```
+
+
+```{r figure the rule of the loops}
+# summaryDS <- c()
+# iris[1:5]
+# mean(iris[,1], na.rm = T)
+# class(iris[1,1])
+
+# class(colnames(iris[1]))
+
+summaryDS <- data.frame()
+
+k <- data.frame(
+  var_name = colnames(iris[1]),
+  mean = mean(iris[,1], na.rm = T),
+  var = var(iris[,1], na.rm = T),
+  mac = max(iris[,1], na.rm = T),
+  min = min(iris[,1], na.rm = T)
+  )
+
+k
+summaryDS
+summaryDS <- rbind(summaryDS, k)
+summaryDS
+
+k <- data.frame(
+  var_name = colnames(iris[2]),
+  mean = mean(iris[,2], na.rm = T),
+  var = var(iris[,2], na.rm = T),
+  mac = max(iris[,2], na.rm = T),
+  min = min(iris[,2], na.rm = T)
+  )
+
+k
+summaryDS
+summaryDS <- rbind(summaryDS, k)
+summaryDS
+``` 
+
+
+```{r write the function within the loop}
+# class(iris[1:2,1])
+# colnames(iris[1])
+SummarizeData <- function(x){
+  
+  summaryDS <- c()
+  
+  for(i in  1:ncol(x)){
+    if(class(x[1:2,i]) == "numeric"){
+      
+      k <- data.frame(
+            var_name = colnames(x[i]),
+            mean = mean(x[,i], na.rm = T),
+            var = var(x[,i], na.rm = T),
+            mac = max(x[,i], na.rm = T),
+            min = min(x[,i], na.rm = T)
+                      )
+
+    }else{
+
+      k <- data.frame(
+            var_name = colnames(x[i]),
+            mean = NA,
+            var = NA,
+            mac = NA,
+            min = NA
+                      )
+
+    }
+    summaryDS <- rbind(summaryDS, k)
+    
+  }
+  print(summaryDS)
+}
+```
+
+```{r work out the function}
+SummarizeData(iris)
+SummarizeData(mtcars)
+
+mtcars
+```
+
+
+## 第二題
+
+> 定義第 i 朵花與第 j 朵花的差異程度為兩朵花資料的歐式距離 (Euclidean distance)，其中 xik 代表第 i 朵花在 iris資料集合中第 k 個變數的數值。試著用 for 迴圈建立一個 150 x 150 的矩陣 A，其中 Aij=d(i,j)。
+
