@@ -17,19 +17,18 @@ knitr::opts_chunk$set(echo = TRUE)
 - 輸入：名為 data.frame 的資料框架，該函數將計算計算 data.frame 的統計量 0    - 輸出：名為 `output` 的資料框架，`output`  columns 的值依序為 `data.frame` 每個 column 的平均數（`mean`）、變異數（`var`）、最大值（`max`）、最小值（`min`），每個 row 是 `data.frame` 的一個 column 
 利用這個函數，計算 iris 資料集合前四個 columns 的各項統計量。
 
-```{r }
-
-```
-
-
-```{r figure the rule of the loops}
+```{r basically access to the datafrme}
 # summaryDS <- c()
 # iris[1:5]
 # mean(iris[,1], na.rm = T)
 # class(iris[1,1])
-
+# class(iris[1:2,1])
+# colnames(iris[1])
 # class(colnames(iris[1]))
+```
 
+
+```{r figure out the rule of the loops}
 summaryDS <- data.frame()
 
 k <- data.frame(
@@ -61,8 +60,6 @@ summaryDS
 
 
 ```{r write the function within the loop}
-# class(iris[1:2,1])
-# colnames(iris[1])
 SummarizeData <- function(x){
   
   summaryDS <- c()
@@ -115,12 +112,16 @@ output：
 - A_150_1： 是指第150朵花和第1朵花的歐式距離
 - 因此上三角，與下三角會對稱
 
-目前想到的講法有兩個：
+目前想到的解法有兩個：
 
 1. 延續上一題的技巧，但是就是要算150次
 2. 有沒有機會可以，寫完一半的矩陣，然後用轉置的方式？（可是感覺未若於第一個好用）
-3. 我想俵
 
+其他：
+
+1. 有沒有內建可以直接計算歐式距離的函數？
+2. 研究了一下，這題其實要考巢狀迴圈的精神。首先我需要計算 __1 和 2,3,4...150__；再來計算 __2 和 1,3,4,5...150__。因此我必須要能夠驅動內部邊際，同時想辦法讓程式可以跨外部邊際進行判斷並運算。
+ 
 ```{r}
 iris
 ```
@@ -131,27 +132,28 @@ eud <- function(x, y){
   dis
 }
 
+# check if reliable
 # x <- c(1,2,3,90)
 # y <- c(4,5,6,100)
 # eud(x,y)
 ```
 
 ```{r 完成巢狀的內層迴圈}
-iris
+
 eud(iris[1,1:4], iris[1,1:4])
 eud(iris[1,1:4], iris[2,1:4])
 eud(iris[1,1:4], iris[3,1:4])
 eud(iris[1,1:4], iris[150,1:4])
 
-eudmatrix <- c()
+eudmatrixtest <- c()
 
 for (i in 1:nrow(iris)) {
   k <- eud(iris[1,1:4], iris[i,1:4])
-  eudmatrix <- rbind(eudmatrix, k)
+  eudmatrixtest <- rbind(eudmatrixtest, k)
 }
 
-length(eudmatrix)
-eudmatrix
+length(eudmatrixtest)
+eudmatrixtest
 
 ```
 
@@ -174,11 +176,12 @@ for (i in 1:nrow(iris)) {
 length(eudmatrix2)
 eudmatrix2
 
-dim(eudmatrix1)
-dim(eudmatrix2)
-
-class(eudmatrix1)
-class(eudmatrix2)
+# check the basic info
+# dim(eudmatrix1)
+# dim(eudmatrix2)
+# 
+# class(eudmatrix1)
+# class(eudmatrix2)
 
 eudmatrix1 <- cbind(eudmatrix1, eudmatrix2)
 dim(eudmatrix1)
@@ -190,7 +193,7 @@ eudmatrix1
 ```{r 建立外層的巢狀迴圈}
 #感覺有一個巢狀迴圈的樣子，先計算一次（每一個sample內）的狀況，然後再跳到下一個sample的狀況。
 
-eudmatrix <- c()
+
 A <- c()
 
 #外層
@@ -198,7 +201,8 @@ for (j in 1:nrow(iris)) {
   eudmatrix <- c()
   #內層
   for (i in 1:nrow(iris)) {
-  #eudmatrix <- c() 若將淨空的程式碼，放在內層迴圈內，表示我每計算一次歐式距離後，eudmartix就會被淨空一次，自然只有計算「與第150號樣本的距離」，所以內迴圈的cell只有1，然後再到外層的cbind，才會變成1*150，且Col150＝0，因為他與自己的距離是=0
+  #eudmatrix <- c() 若將淨空的程式碼，放在內層迴圈內，表示我每計算一次歐式距離後，eudmartix就會被淨空一次，自然只有計算「與第150號樣本的距離」，所以內迴圈的cell只有1，然後再到外層的cbind，才會變成1*150，且Col150＝0，因為他與自己的距離是=0。這和code chunk[嘗試建立外層的巢狀迴圈]，為何一開始得空箱子需要訂在迴圈外面，這裡形同在內層迴圈外面，但是在外層迴圈裡面。
+  #同理這也是為什麼A，需要被定義在整個巢狀迴圈外面。
   k <- eud(iris[j,1:4], iris[i,1:4])
   eudmatrix <- rbind(eudmatrix, k)
   }
