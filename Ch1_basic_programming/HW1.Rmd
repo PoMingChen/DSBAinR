@@ -180,9 +180,9 @@ dim(eudmatrix2)
 class(eudmatrix1)
 class(eudmatrix2)
 
-eudmatrixtest <- cbind(eudmatrix1, eudmatrix2, )
-dim(eudmatrixtest)
-eudmatrixtest
+eudmatrix1 <- cbind(eudmatrix1, eudmatrix2)
+dim(eudmatrix1)
+eudmatrix1
 
 ```
 
@@ -193,38 +193,22 @@ eudmatrixtest
 eudmatrix <- c()
 A <- c()
 
-for (j in 1:row(iris)) {
+#外層
+for (j in 1:nrow(iris)) {
+  eudmatrix <- c()
+  #內層
   for (i in 1:nrow(iris)) {
+  #eudmatrix <- c() 若將淨空的程式碼，放在內層迴圈內，表示我每計算一次歐式距離後，eudmartix就會被淨空一次，自然只有計算「與第150號樣本的距離」，所以內迴圈的cell只有1，然後再到外層的cbind，才會變成1*150，且Col150＝0，因為他與自己的距離是=0
   k <- eud(iris[j,1:4], iris[i,1:4])
   eudmatrix <- rbind(eudmatrix, k)
-}
+  }
   A <- cbind(A, eudmatrix)
 }
 
 A
-```
-
-
-```{r}
-x <- matrix(rnorm(100), nrow = 5)
-# x1 <- matrix(rnorm(100))
-# x1
-dist(x)
-dist(x, diag = TRUE)
-dist(x, upper = TRUE, diag = T)
-m <- as.matrix(dist(x))
-d <- as.dist(m)
-stopifnot(d == dist(x))
-
-class(m)
-d
-```
-
-```{r}
-## Use correlations between variables "as distance"
-dd <- as.dist((1 - cor(USJudgeRatings))/2)
-round(1000 * dd) # (prints more nicely)
-plot(hclust(dd)) # to see a dendrogram of clustered variables
+dim(A)
+diag(A)
+class(A)
 ```
 
 
