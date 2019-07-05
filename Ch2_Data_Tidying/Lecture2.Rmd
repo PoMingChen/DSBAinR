@@ -1,0 +1,73 @@
+---
+title: "Ch2_LectureContent"
+author: "PoMingChen"
+date: "7/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 2.2
+
+```{r}
+class(iris[,1])
+```
+
+```{r}
+class(iris[,1:2])
+```
+
+### 2.3
+
+```{r}
+library(readr)
+
+#with "," as separation
+read_csv("./2-3_file1.csv")
+```
+
+```{r}
+#with ";" as separation
+read_csv2("./2-3_file2.csv")
+```
+
+```{r}
+#with "|"(自訂參數)as separation
+read_delim("2-3_file3.txt", delim = "|")
+```
+
+```{r}
+#with "tab" as separation
+read_tsv("2-3_file4.tsv")
+```
+
+#### read excel files
+```{r}
+library(readxl)
+```
+
+```{r}
+#check how many worksheet are in the excel file, and the name of it
+excel_sheets("2-3_datasets.xlsx")
+```
+
+```{r}
+## read_excel() reads both xls and xlsx files and detects the format from the extension.
+read_excel("2-3_datasets.xlsx")
+```
+
+```{r}
+#可以選擇特定的活頁簿 (worksheets) 輸入（如果不指定活頁簿，會輸入檔案中的第一個活頁簿）。
+read_excel("2-3_datasets.xlsx", sheet = "chickwts")
+```
+
+```{r}
+read_excel("2-3_datasets.xlsx", range = "mtcars!B1:D5")
+```
+
+```{r}
+read_excel("2-3_datasets.xlsx", na = "setosa")
+```
+
