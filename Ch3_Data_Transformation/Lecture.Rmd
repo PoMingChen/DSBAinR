@@ -17,10 +17,11 @@ library(tidyverse)
 
 ```{r}
 mtcars.tb <- as_tibble(mtcars)
+class(mtcars.tb)
 ```
 
 ```{r}
-mtcars %>% group_by(cyl) %>% do(browser())
+# mtcars %>% group_by(cyl) %>% do(browser())
 ```
 
 找各組前三名
