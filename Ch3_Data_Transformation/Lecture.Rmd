@@ -1,0 +1,33 @@
+---
+title: "Ch3_lecture"
+author: "PoMingChen"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## group_by
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+mtcars.tb <- as_tibble(mtcars)
+```
+
+```{r}
+mtcars %>% group_by(cyl) %>% do(browser())
+```
+
+找各組前三名
+```{r}
+mtcars.tb %>%
+  group_by(cyl) %>%
+  filter(rank(desc(hp)) < 4) %>%
+  arrange(desc(cyl), desc(hp))
+```
+
