@@ -1,0 +1,435 @@
+---
+title: "Ch6_Lecture"
+author: "PoMingChen"
+date: "7/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 資料整理
+
+```{r 引入資料}
+library(tidyverse)
+library(knitr)
+
+SalesTable <- read_csv('SalesTable.csv')
+ClientTable <- read_csv('ClientTable.csv')
+ProductTable <- read_csv('ProductTable.csv')
+```
+
+```{r}
+SalesTable
+ClientTable
+ProductTable
+```
+
+
+```{r 合併資料集}
+SalesTableNew <- SalesTable %>%
+  inner_join(ClientTable, by = 'Client_ID') %>%
+  inner_join(ProductTable, by = 'Product_ID')
+
+kable(SalesTableNew[1:10,])
+```
+
+```{r}
+SalesTableNew
+```
+
+```{r 轉換成適當的類別變數}
+SalesTableNew$Agency <- as.factor(SalesTableNew$Agency)
+SalesTableNew$Product_ID <- as.factor(SalesTableNew$Product_ID)
+SalesTableNew$Client_ID <- as.factor(SalesTableNew$Client_ID)
+```
+
+---
+
+## EDA以及潛在發問
+
+```{r}
+SalesTableNew
+```
+
+```{r}
+SalesTablePrice <- SalesTableNew %>%
+  mutate( Unit_Price = Sales / Sales_Amount) %>% select(1:5, Unit_Price, everything())
+
+SalesTablePrice
+```
+
+### 商品單價與銷售量關係（P Q）
+
+> P Q比較是一個很基本的內容
+
+```{r}
+ggplot(data = SalesTablePrice,
+             aes( x = Unit_Price,
+                  y = Sales_Amount))+
+  geom_point(color = 'red',
+             alpha = 0.5) + theme_bw()
+```
+
+### 各個客戶，其產品的銷售狀況（分配）
+
+> 我們家的產品，是否有哪些客戶，賣給他們的時候整體的銷售額狀況怎麼樣？
+
+```{r}
+ggplot(SalesTableNew)+geom_boxplot( aes( x = factor(Client_Name),
+                                         y = Sales,
+                                         colour = Client_Name))+
+  labs( x = 'Client',
+        title = 'Sales Distribution by Client') + theme_bw()
+```
+
+### 觀察過去一個月，哪一個客戶貢獻給我們的營收最多（他的Sales額度最高）
+
+> 各個資料及本身就是過去一個月的。
+
+> CC AA BB DD 是我們的四個終端下游大客戶。
+
+```{r}
+SalesTableSum <- SalesTableNew %>%
+  group_by( Client_Name) %>%
+  summarise( Sales_Sum = sum(Sales)) %>%
+  arrange(desc(Sales_Sum))
+
+ggplot( data = SalesTableSum,
+        aes( x = Client_Name,
+             y = Sales_Sum,
+             fill = Client_Name)) + 
+  geom_bar( stat = 'identity') +
+  
+  scale_x_discrete(limits = SalesTableSum$Client_Name) +
+  
+  labs(title = 'Total Sales by Client',
+           x = 'Client',
+           y = 'Sales in total',
+       fill = 'Client_Name') + theme_bw()
+```
+
+### 賣給各個客戶間的平均單位商品價格多少（Unit Price）
+
+> 我們有沒有做到差別取價？
+
+結果我們發現，我們的代理香把我們的食品賣給終端的下游客戶的時候，不太有什麼特殊的策略。大家的中位數都差不多。
+
+```{r}
+ggplot( data = SalesTablePrice) + 
+  geom_boxplot(aes( x = as.factor(Client_Name),
+             y = Unit_Price,
+             colour = Client_Name)) +
+  
+  labs(title = 'Unit_Price by Client',
+           x = 'Client',
+           y = 'Unit_Price in total',
+       fill = 'Client_Name') + theme_bw()
+```
+
+### 各個產品間的銷售額差異
+
+確實有幾個產品的銷售額比較高，他們賣得比較好。像是F H P Q等等
+
+```{r}
+ggplot( data = SalesTableNew) + 
+  geom_boxplot(aes( x = Product_Name,
+                    y = Sales,
+                    colour = Product_Name)) +
+  labs( x = 'Product',
+        title = 'Sales Distribution by Product') + theme_bw()
+```
+
+若以單一產品總銷售額來看
+
+H D B P 是我們的明星產品。
+
+```{r}
+SalesTableAmount <- SalesTableNew %>%
+  group_by( Product_Name) %>%
+  summarise( Amount_Sum = sum(Sales_Amount)) %>%
+  arrange(desc(Amount_Sum))
+
+ggplot( data = SalesTableAmount) + 
+  geom_bar( aes( x = Product_Name,
+             y = Amount_Sum,
+             fill = Product_Name),
+            stat = 'identity') +
+  
+  scale_x_discrete(limits = SalesTableAmount$Client_Name) +
+  
+  labs(title = 'Total Sales_Amount by Product',
+           x = 'Product',
+           y = 'Sales_Amount in total',
+       fill = 'Product_Name') + theme_bw()
+```
+
+### 觀察各個客戶，他們分別購買了哪些我們的產品比較多
+
+> 很明顯的，AA BB CC  DD 這幾個客戶是我們的大客戶。H D B P 是我們的明星產品。 
+
+```{r}
+SalesTableClient <- SalesTableNew %>%
+  group_by(Client_Name, Product_Name) %>%
+  summarise( Sales = sum(Sales))
+
+SalesTableClient
+
+ggplot( data = SalesTableClient) +
+  geom_bar( aes( x = Product_Name,
+                 y = Sales),
+            stat = 'identity') +
+  facet_wrap( ~ Client_Name)
+```
+
+> 我們一共有14家經銷商（代理商），其中比較集中在101 107 111 114四家代理商
+
+```{r}
+SalesTableAgency <- SalesTableNew %>%
+  group_by(Agency, Product_Name) %>%
+  summarise( Sales = sum(Sales))
+
+SalesTableAgency
+
+ggplot( data = SalesTableAgency) +
+  geom_bar( aes( x = Product_Name,
+                 y = Sales),
+            stat = 'identity') +
+  facet_wrap( ~ Agency)
+```
+
+---
+
+## 進階綜合分析
+
+> 跨客戶，跨產品比較
+
+前面都只是稍微看一下目前整體商業模式運作的狀況，有什麼的現象（傾向）等等。現在想要繼續挖深一點，到底每一個下游客戶，都跟我們買了什麼東西？那他們各自買了多少？兩倆之間的比較如何？
+
+```{r}
+Product <- SalesTableNew %>%
+  group_by(Client_Name, Product_Name) %>%
+  summarise(Sales = sum(Sales)) %>%
+  mutate(Propor = round(Sales / sum(Sales),1) * 100)
+
+
+ggplot( data = Product) + 
+  geom_bar( aes( x = Client_Name, 
+                 y = Sales,
+                 fill = Product_Name),stat = 'identity', alpha = 0.8) + 
+  geom_text( aes(x = Client_Name, 
+                 y = Sales,
+                 fill = Product_Name, label = paste(Propor,'%', sep='')),position = position_stack( vjust = 0.5), size = 2) + theme_bw()
+```
+
+比較理想的做法是，我們重新去審視這個情境：今天 __多個客戶和多個產品擺在同一張圖表呈現__，為的就是要能清楚地比較彼此的差異，因此，將數值 __標準化（用百分比）__後，再妥善利用形狀、空間及顏色，就可以得到一張比較直觀卻又不會遺失太多資訊的圖表，這張圖我們主要用`geom_rect()`來完成。
+
+```{r}
+### 將原始數值轉換成圖表需要的極值和比例
+Product <- SalesTableNew %>%
+  group_by(Client_Name, Product_Name) %>%
+  summarise(Sales = sum(Sales))
+
+Product
+
+ClientProductTable <- Product %>%
+  spread( key = Product_Name, 
+          value = Sales) %>%
+  data.frame()
+```
+
+```{r geom_rect拆解觀察}
+  for (i in 1:nrow(ClientProductTable)) {
+    
+    #x_percentage是ClientProductTable，可以用這個方式新增新變數。（塞一個vector進去）
+    ClientProductTable$x_percentage[i] <- rowSums(ClientProductTable[i,-1], na.rm = T) / sum(rowSums(ClientProductTable[,-1], na.rm = T)) ##Form row sums and means for numeric arrays (or data frames). 形塑每一個客戶本身，他是站我總營收的比例有多少。
+    
+    ## 每一個rowSum，都是一個客戶，他過去一個月的營業總和
+    ## sum(rowSums())，那就是把各個客戶的營業總和加起來，自然就是我的過去一個月的總銷售額。相除起來也就是單一客戶貢獻給我多少營收。
+  }
+
+ClientProductTable
+```
+
+
+```{r}
+Block <- function(ClientProductTable){
+  
+  ClientProductTable$x_Percentage <- c()
+  
+  ### X軸的比例，各個客戶貢獻我多少百分比的營收。
+  for (i in 1:nrow(ClientProductTable)) {
+    ClientProductTable$x_percentage[i] <- rowSums(ClientProductTable[i,-1], na.rm = T) / sum(rowSums(ClientProductTable[,-1], na.rm = T)) ##Form row sums and means for numeric arrays (or data frames). 形塑每一個客戶本身，他的各式產品佔他多少營收。
+  }
+  
+  ### X軸比例，計算上界和下界
+  ClientProductTable$x_max <- cumsum(ClientProductTable$x_percentage) ## cumsum() 累積加總
+  ClientProductTable$x_min <- ClientProductTable$x_max - ClientProductTable$x_percentage
+  ClientProductTable$x_percentage <- NULL
+  
+  #Percentage <- ClientProductTable %>%
+   # gather( key =  Product_Name,
+    #        value = c('Client_Name', 'x_min', 'x_max'),
+     #       -c( Client_Name, x_min, x_max))
+  
+  ClientProductTable
+  
+  ### 到目前為止已經有x_min x_max，基本上x軸已經準備好了。
+  Percentage <- ClientProductTable %>%
+  gather( key =  Product_Name,
+          value = Sales, ## 銷售額
+          -c(Client_Name, x_min,x_max))#A,B,C,D,F,G,H,J,K,L,N,O,P,Q,R)
+  
+
+  ### 把NA，沒有任何銷售額資料的，用0去填滿，或者維持原樣。
+  Percentage[,5] <- ifelse(Percentage[,5] %in% NA, 0, Percentage[,5])
+  colnames(Percentage)[5] <- 'Sales'
+  
+  ### Y軸的比例，計算同一個客戶本身（所以只需要group_by client_name)，各式商品間，他跟我買了什麼比較多。
+  Percentage <- Percentage %>%
+    group_by( Client_Name) %>%
+    mutate( y_max = round(cumsum(Sales) / sum(Sales) * 100)) %>%
+    mutate( y_min = round((y_max - Sales/ sum(Sales) * 100)))
+  
+
+
+  
+  ### 文字的位置
+  Percentage <- Percentage %>%
+    mutate( x_text = x_min + (x_max - x_min)/2,  ##剛好在一半的位置
+            y_text = y_min + (y_max - y_min)/2)  ##剛好在一半的位置
+  
+
+  # Proportion這個變數，是為了要貼在圖上的那個標籤所要顯現的文字。因為你擁有的都只有geom函數所需要的上下界。
+  Percentage <- Percentage %>%
+    group_by( Client_Name) %>%
+    mutate( Proportion = round( Sales / sum(Sales),2) * 100)
+  
+  Percentage 
+  
+  ### 作圖
+  ggplot(Percentage, aes(ymin = y_min, ymax = y_max,
+                      xmin = x_min, xmax = x_max, fill = Product_Name)) +
+        geom_rect(colour = I("grey"), alpha = 0.9) + 
+        geom_text(aes(x = x_text, y = y_text,
+                 label = ifelse( Client_Name %in% levels(factor(Client_Name))[1] & Proportion != 0, ##Line319，有個用意，他將圖上的第一列產品，的標籤，前面再加一個產品的代號，這樣就可以方便對照（類似經濟學人會幹的事）。
+                                 paste(Product_Name," - ", Proportion, "%", sep = ""),
+                                 ifelse(Proportion != 0, paste( Proportion,"%", sep = ""), paste(NULL)))), size = 2.5) + 
+    geom_text(aes(x = x_text, y = 103,
+                  label = paste(Client_Name)), size = 3) + 
+    labs( title = 'Sales Distribution by Client & Product',
+          x = 'Client',
+          y = 'Product') + theme_bw()
+}
+
+```
+
+```{r}
+Block(ClientProductTable)
+```
+
+---
+
+## 資料的取捨
+
+> 我覺得這個概念也滿重要的，所以我給他H2
+
+有時候，過多的資訊對於閱讀者而言並不是一件容易的事情，所以資訊圖表的設計者，在參考使用者的建議後，可以進一步篩選資訊。這邊我們依銷售額的大小，將客戶分為Big、Middle和Small，再分別作圖。
+
+```{r}
+Product
+```
+
+
+AA CC 算是Big，BB DD HH是Middle
+```{r}
+ClientMiddle <- Product %>%
+  filter( Client_Name %in% 'BB' | Client_Name %in% 'DD' | Client_Name %in% 'HH')
+```
+
+```{r}
+ClientMiddle
+```
+
+```{r}
+ClientProductTable <- ClientMiddle %>%
+  spread( key = Product_Name, 
+          value = Sales) %>%
+  data.frame()
+ClientProductTable
+```
+
+```{r}
+Block(ClientProductTable)
+```
+
+---
+
+## 產品價格、銷售、銷量、毛利
+
+> 我們加入產品毛利(率)的比較。
+
+```{r}
+MarginTable <- read_csv('SalesTable_WithCost.csv')
+MarginTable$Product_ID <- MarginTable$Product_ID %>% as.factor()
+MarginTable$Margin_Rate <- MarginTable$Margin_Rate %>% round(3)
+MarginTable
+
+
+SalesTableMargin <- SalesTableNew %>%
+  inner_join(MarginTable, by = 'Product_ID')
+
+SalesTableMargin
+
+ProductSalesTable <- SalesTableMargin %>%
+  group_by(Product_Name) %>%
+  summarise( Sales = sum(Sales),
+             Sales_Amount = sum(Sales_Amount),
+             Margin_Rate = mean(Margin_Rate)) %>%
+  mutate( Price = Sales/Sales_Amount,
+          Margin_Group = ifelse( Margin_Rate > 0.7, 'Top', ##注意ifelse() 這個函數可以在“no”的那塊裡面再加上一個ifelse的條件。
+                            ifelse( Margin_Rate >= 0.5 & Margin_Rate < 0.7, 'Normal', 'Bad'))) %>%
+  arrange(desc(Sales))
+
+ProductSalesTable
+
+ggplot( data = ProductSalesTable,
+        aes( x = Sales_Amount,
+             y = Price,
+             colour = Margin_Group)) + 
+  geom_point(alpha = 0.9) +
+  geom_point( aes(size = Sales))+
+  geom_text( aes( label = Product_Name), vjust = -3, size = 2, colour = 'black') + 
+  geom_vline( aes( xintercept = mean(Sales_Amount))) + 
+  geom_hline( aes( yintercept = mean(Price))) + #單位產品平均價格（這是為什麼之前還要先算`Price`，形同`Unit Price`的變數）
+  
+  labs( title = 'Price, Sales_Amount, Sales and Margin') + 
+  
+  theme_bw()
+```
+
+#### 引入plotly套件
+
+```{r}
+library(plotly)
+
+#另存一個圖片物件
+MarginPlot <- ggplot( data = ProductSalesTable,
+        aes( x = Sales_Amount,
+             y = Price,
+             colour = Margin_Group)) + 
+  geom_point(alpha = 0.9) +
+  geom_point( aes(size = Sales)) + 
+  geom_text( aes( label = Product_Name), vjust = -3, size = 2, colour = 'black') + 
+  geom_vline( aes( xintercept = mean(Sales_Amount))) + 
+  geom_hline( aes( yintercept = mean(Price))) + 
+  
+  labs( title = 'Price, Sales_Amount, Sales and Margin') + 
+  
+  theme_bw()
+
+
+ggplotly(MarginPlot)
+```
+
