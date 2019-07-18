@@ -1,0 +1,254 @@
+---
+title: "AB Testing"
+author: "PoMingChen"
+date: "7/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## setting
+
+```{r}
+library("tidyverse")
+```
+
+```{r}
+test.table <- read_csv("./test_table.csv")
+user.table <- read_csv("./user_table.csv")
+```
+
+```{r}
+test.table %>% colnames()
+user.table %>% colnames()
+```
+
+```{r}
+head(test.table)
+head(user.table)
+```
+
+## EDA
+
+重點是，有納入到實驗設計的那些人，包含實驗組和對照組，是否都可以在其資本資料對得起來。
+
+```{r}
+print(paste("user_table 中不重複使用者數量:",
+            nrow(unique(select(user.table, user_id)))))
+```
+
+```{r}
+print(paste("test_table 中不重複使用者數量:",
+            nrow(unique(select(test.table, user_id)))))
+```
+
+```{r}
+print(paste("重複出現在user_table與test_table中不重複使用者數量:",
+            nrow(unique(
+              inner_join(select(test.table, user_id),
+                         select(user.table, user_id),
+                         by = "user_id")))))
+```
+
+---
+
+```{r}
+print(paste("實驗組次數:",
+            sum(
+              unique(test.table)$test == 1)
+            ))
+```
+
+```{r}
+print(paste("對照組次數:",
+            sum(
+              unique(test.table)$test == 0)
+            ))
+```
+
+確定了實驗個體後，我們就可以來合併實驗表格與使用者資料，邏輯應該是：test_table要全部資料都有，user_table則不需要，因此採用 left_join 的方式。
+
+```{r}
+test.data <- left_join(test.table,
+                       user.table,
+                       by = "user_id")
+
+head(test.data)
+```
+
+#### Data Transformation
+
+```{r}
+test.data$date <- as.Date(test.data$date, format = "%Y/%m/%d")
+
+test.data
+
+# the catogory must be factor rather than character
+for(i in c(3,4,6,7,9)){
+  test.data[, i] <- as.factor(test.data[[i]]) #[[i]] in tibble will be vector, and [i] just be tibble
+}
+
+head(test.data)
+```
+
+```{r}
+summary(test.data)
+```
+
+#### EDA within different dimension
+
+- treatment and control
+
+```{r}
+test.data %>%
+  group_by(test) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+- different device
+
+```{r}
+test.data %>%
+  group_by(device) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+- gender
+
+```{r}
+test.data %>%
+  group_by(gender) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+- service
+
+```{r}
+test.data %>%
+  group_by(service) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+- country
+
+```{r}
+test.data %>%
+  group_by(country) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+- country and the treatment
+
+```{r}
+test.data %>%
+  group_by(country, test) %>%
+  summarise(mean_purchase_amount = mean(purchase_amount))
+```
+
+## Data Analysis
+
+> 獨立樣本t檢定；若母體標準差已知則為z檢定，若未知，只有得知樣本標準誤的話，就是t檢定
+
+```{r}
+t.test(test.data[test.data$test == 1, ]$purchase_amount,
+       test.data[test.data$test == 0, ]$purchase_amount,
+       alternative = "greater") #這個參數用意在於要設定H1:實驗組-對照組>0，反之則為= or <
+```
+
+> 我們可以透過 R 語言中的 `aov` 進行分析，暸解因子是否會影響購物金額。雖然在課程中我們介紹的是(單因子)(只有按鈕)變異數分析，但多因子的解讀方式其實也是一樣的。從下列的結果我們可以發現：
+
+```{r}
+aov.model <- aov(
+  purchase_amount ~ test + country + device + gender + service, #這邊和OLS很像，被解釋變數都是放在左邊
+  test.data)
+summary(aov.model)
+```
+
+```{r}
+interaction.model <- aov(
+  purchase_amount ~ test*country + test*device + test*service,
+  test.data)
+summary(interaction.model)
+```
+
+```{r}
+interaction.model <- aov(
+  purchase_amount ~ test*country + device + service, #你有寫*交互作用項，就會一次跑三個了。
+  test.data)
+summary(interaction.model)
+```
+
+#### Tukey HSD
+
+在課程中我們有介紹過，可以使用 Tukey 事後檢定，回答「平均購買金額差異為多少？」在 R 語言中，我們可以透過 TukeyHSD 函數進行事後檢定，如下所示。
+
+> 也就是test=1/0，實驗組和對照組兩者，在purchase_amount(平均購買金額差異多少)，具體的數字狀況為何？
+
+```{r}
+TukeyHSD(interaction.model, "test")
+```
+
+```{r}
+#country差很多，自然地就很多項
+TukeyHSD(interaction.model, "country")
+```
+
+```{r}
+plot(TukeyHSD(interaction.model, "country"))
+```
+
+
+## Data Viz
+
+> 你如何一目瞭然地，呈現實驗組和對照組的行為表現差異(現在只討論`test`這個因子)
+
+- 時間趨勢折線圖
+- 機率分配密度圖
+
+1. 時間趨勢折線圖
+```{r}
+daily.purchase <- test.data %>%
+  group_by(date, test) %>%
+  summarise(purchase_amount = mean(purchase_amount))
+
+ggplot(daily.purchase, aes(x = date, y = purchase_amount, colour = test)) + 
+  geom_point() + geom_line() +
+  xlab("Date") + ylab("Purchase Amount") + ylim(c(30, 50)) + #ylim: y-axis limit
+  ggtitle("Time Series Plot of Purchase Amount: Test versus Control") +
+  theme_bw()
+```
+
+2. 機率分配密度圖
+```{r}
+ggplot(test.data, aes(purchase_amount, fill = test, colour = test)) + #geom_density is for one continuous variable (with kernel base)
+  geom_density(alpha = 0.3) +  ##alpha = 1看看會發生什麼事
+  xlab("Purchase Amount") + ylab("Density") +
+  ggtitle("Density Plot of Purchase Amount: Test versus Control") +
+  theme_bw()
+```
+
+#### 你如何同時討論不同的因子，若其為非二元（not-binary），像是國家（五個），對於銷售金額的影響
+```{r}
+ggplot(test.data, aes(x = country, y = purchase_amount)) +
+  geom_boxplot() +
+  xlab("Country") + ylab("Purchase Amount") +
+  ggtitle("Boxplot of Purchase Amount by Country") +
+  theme_bw()
+```
+
+#### 交互作用項
+
+> 在前面的變異數分析中，我們有發現 `test:country` 有極為顯著的交互作用。因此，我們特別看看交互作用造成的影響。
+
+
+結果我們發現，只有日本的case，比較不一樣（換成顯眼的按鈕反而銷售數字下滑）
+```{r}
+ggplot(test.data, aes(x = country, y = purchase_amount, colour = test)) + #用colour放在同一個維度去比較（交互作用可以同時呈現）
+  geom_boxplot() +
+  xlab("Country") + ylab("Purchase Amount") +
+  ggtitle("Boxplot of Purchase Amount by Country: Test versus Control") +
+  theme_bw()
+```
+
