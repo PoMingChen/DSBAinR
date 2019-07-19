@@ -27,8 +27,8 @@ setwd("你的完整工作路徑名稱")
 
 ```{r}
 library(tidyverse)
-read_csv("./test_table.csv", locale = locale(encoding = "UTF-8"))
-read_csv("./user_table.csv", locale = locale(encoding = "UTF-8")) 
+read_csv("./test_table.csv", locale = locale(encoding = "UTF-8")) -> test.table2
+read_csv("./user_table.csv", locale = locale(encoding = "UTF-8")) -> user.table2
 set.seed(500)
 ```
 
@@ -47,6 +47,63 @@ set.seed(500)
 篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
 反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
 請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
+
+#### 資料清理
+```{r}
+test.table2
+user.table2
+```
+
+```{r}
+test.table2$date <- as.Date(test.table2$date, format = "%Y/%m/%d")
+test.table2
+```
+
+```{r 轉換資料屬性1}
+test.table2
+for (i in c(3,4)) {
+  test.table2[i] <- as.factor(test.table2[[i]])
+}
+test.table2
+```
+
+```{r 轉換資料屬性2}
+user.table2
+for (i in c(2,3,5)) {
+  user.table2[i] <- as.factor(user.table2[[i]])
+}
+
+levels(user.table2$service)
+```
+
+```{r}
+test.table2
+user.table2
+```
+
+```{r 受實驗者究竟有多少個獨立用戶}
+print(paste("受實驗者究竟有多少個獨立用戶:", 
+            nrow(unique(select(test.table2, user_id))), sep = " "))
+```
+
+```{r}
+print(paste("資料庫裡面究竟有多少個獨立用戶:",
+            nrow(unique(select(user.table2, user_id))), sep = " "))
+```
+
+```{r 是否每一個有成為受測者的用戶，在資料庫本身都有其基本資料} 
+nrow(
+  unique(
+    select(inner_join(test.table2, user.table2, by = "user_id"), user_id)))
+```
+
+
+```{r}
+analysis.table <- left_join(test.table2, user.table2, by="user_id")
+analysis.table
+
+nrow(unique(select(analysis.table, user_id))) ## 19871
+```
 
 
 
