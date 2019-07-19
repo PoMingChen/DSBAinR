@@ -42,12 +42,6 @@ set.seed(500)
 
 請使用uset_table.csv 與 test_table.csv 兩組資料集合(可於上一單元下載)，依照以下題目及步驟完成此次作業：
 
-### 題目一
-
-篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
-反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
-請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
-
 #### 資料清理
 ```{r}
 test.table2
@@ -98,13 +92,28 @@ nrow(
 ```
 
 
-```{r}
+```{r 將實驗資料與使用者資料合併}
 analysis.table <- left_join(test.table2, user.table2, by="user_id")
 analysis.table
 
 nrow(unique(select(analysis.table, user_id))) ## 19871
 ```
 
+```{r 實驗組與對照組的樣本數檢查}
+analysis.table %>% filter(test == 1) %>% nrow()
+analysis.table %>% filter(test == 0) %>% nrow()
+```
+
+### 題目一
+
+篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
+反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
+請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
+
+```{r}
+analysis.table
+analysis.table %>% filter(country == "JP")
+```
 
 
 ### 題目二
