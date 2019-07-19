@@ -1,0 +1,64 @@
+---
+title: "HW ch7"
+author: "PoMingChen"
+date: "7/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####  注意事項
+
+1.設置工作路徑，並確定兩個資料集合都放置在你的工作路徑：
+setwd("你的完整工作路徑名稱")
+
+檔案的編碼皆為UTF-8，讀取檔案時請注意：
+2. 讀成data.frame
+`read.csv('檔案名稱', encoding = 'UTF-8')`
+3. 讀成tibble
+`read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
+為了避免程式中的隨機效果造成答案不一致，請將隨機種子設置為500：
+`set.seed(500)`
+
+
+####  Env setting
+
+```{r}
+library(tidyverse)
+read_csv("./test_table.csv", locale = locale(encoding = "UTF-8"))
+read_csv("./user_table.csv", locale = locale(encoding = "UTF-8")) 
+set.seed(500)
+```
+
+---
+
+## 作業說明
+
+在這個章節的作業中，我們同樣利用「使用者購買行為」的資料集分析實驗設計的結果，了解影響消費者購買金額的重要變因，並探究哪個因素最能夠影響實驗結果。
+
+## 作業題目
+
+請使用uset_table.csv 與 test_table.csv 兩組資料集合(可於上一單元下載)，依照以下題目及步驟完成此次作業：
+
+### 題目一
+
+篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。
+
+1. 請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
+反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
+請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
+
+
+
+
+### 題目二
+
+建立購物金額與是否為實驗組、設備、性別與服務的變異數分析(ANOVA)模型。請問，模型中有哪些因子是顯著的？
+請利用 ggplot2 繪製購買金額對應不同服務的盒狀圖 (boxplot)。
+請進行 Tukey 事後檢定，了解 test 對於購買金額的影響，並繪製信賴區間圖形。
+請進行 Tukey 事後檢定，了解 device 對於購買金額的影響，並繪製信賴區間圖形。
+
+
+
