@@ -27,7 +27,8 @@ setwd("你的完整工作路徑名稱")
 
 ```{r}
 library(tidyverse)
-read_csv("./test_table.csv", locale = locale(encoding = "UTF-8")) -> test.table2
+library(ggplot2)
+read_csv("./test_table.csv", locale = locale(encoding = "UTF-8")) -> test.table2 ##注意`read_csv`和`read.csv`差異，一個會讀成tibble，一個是data.frame
 read_csv("./user_table.csv", locale = locale(encoding = "UTF-8")) -> user.table2
 set.seed(500)
 ```
@@ -44,13 +45,13 @@ set.seed(500)
 
 #### 資料清理
 ```{r}
-test.table2
-user.table2
+test.table2 #100000 rows
+user.table2 #20000 rows
 ```
 
 ```{r}
-test.table2$date <- as.Date(test.table2$date, format = "%Y/%m/%d")
-test.table2
+test.table2$date <- as.Date(test.table2$date, format = "%Y/%m/%d") #用 dollar sign，必會回傳vector，若要用[[]] []則需要考慮資料表是tibble or dataframe
+# test.table2$date
 ```
 
 ```{r 轉換資料屬性1}
@@ -67,20 +68,20 @@ for (i in c(2,3,5)) {
   user.table2[i] <- as.factor(user.table2[[i]])
 }
 
-levels(user.table2$service)
+# levels(user.table2$service)
 ```
 
-```{r}
+```{r 資料轉換完畢}
 test.table2
 user.table2
 ```
 
 ```{r 受實驗者究竟有多少個獨立用戶}
 print(paste("受實驗者究竟有多少個獨立用戶:", 
-            nrow(unique(select(test.table2, user_id))), sep = " "))
+            nrow(unique(select(test.table2, user_id))), sep = " ")) #unique取出全然獨立的號碼。然後nrow看他有幾個列，自然也就是共有幾個受實驗者。
 ```
 
-```{r}
+```{r 資料庫裡面究竟有多少個獨立用戶}
 print(paste("資料庫裡面究竟有多少個獨立用戶:",
             nrow(unique(select(user.table2, user_id))), sep = " "))
 ```
@@ -89,60 +90,119 @@ print(paste("資料庫裡面究竟有多少個獨立用戶:",
 nrow(
   unique(
     select(inner_join(test.table2, user.table2, by = "user_id"), user_id)))
+
+#如果取出來交集小於19871，那麼表示有受測者，我們在資料庫裡面沒有他的基本資料，這可能帶來一些問題。就變得說兩組樣本的立足點，在進行實驗前沒有去做檢查，自然你也不知道兩群人的特質是否相同。
 ```
 
 
 ```{r 將實驗資料與使用者資料合併}
-analysis.table <- left_join(test.table2, user.table2, by="user_id")
+analysis.table <- left_join(test.table2, user.table2, by="user_id") #我們不會想輕易放掉任何受測樣本，所以以test.table為主
 analysis.table
 
 nrow(unique(select(analysis.table, user_id))) ## 19871
 ```
 
 ```{r 實驗組與對照組的樣本數檢查}
-analysis.table %>% filter(test == 1) %>% nrow()
-analysis.table %>% filter(test == 0) %>% nrow()
+analysis.table %>% filter(test == 1) %>% nrow() #50012
+analysis.table %>% filter(test == 0) %>% nrow() #49988
 ```
 
 ### 題目一
 
+> 這題主要練習`獨立樣本t檢定`
+
 篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。
 請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
 反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
-請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
+
 
 ```{r}
 analysis.table
 analysis.table %>% filter(country == "JP") -> analysis.table.JP
 ```
 
+答案是實驗組的購買金額，並沒有顯著高於對照組。
+我們不能拒絕H0: `實驗組的購買金額沒有顯著高於對照組的購買金額` 的假設
 ```{r 實驗組的購買金額有沒有顯著高於對照組的購買金額？}
 analysis.table.JP
-analysis.table.JP[analysis.table.JP$test==1, ] ##重點是將實驗組與對照組區分出來
-analysis.table.JP[analysis.table.JP$test==0, ] 
-t.test(x = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異 
+# analysis.table.JP[analysis.table.JP$test==1, ] ##重點是將實驗組與對照組區分出來
+# analysis.table.JP[analysis.table.JP$test==0, ] 
+t.test(x = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異, 所以還是要用dollar sign pick up purchase_amount
        y = analysis.table.JP[analysis.table.JP$test==0, ]$purchase_amount,
        alternative = "greater")
 ```
 
-
+答案是對照組的購買金額，有顯著高於實驗組。
+我們可以拒絕H0: `對照組的購買金額沒有顯著高於實驗組的購買金額` 的假設
 ```{r 對照組的購買金額有沒有顯著高於實驗組的購買金額？}
 t.test(x = analysis.table.JP[analysis.table.JP$test==0, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異 
        y = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount,
        alternative = "greater")
 ```
 
+請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
 ```{r}
+ggplot(data = analysis.table.JP) + 
+  geom_density(aes(purchase_amount, #geom_density is one-continuous variable mapping, and the y-axis is about the density of certain x-value.
+                   fill = test,
+                   color = test,
+                   ), alpha = 0.4) + 
+  coord_cartesian(ylim = c(0, 0.07)) + 
+  labs(x = "purchase amount",
+       title = "The density distribution of JP on Button A/B Testing") + 
+  theme_classic()
 
-```
+``` 
 
 
 ### 題目二
 
-建立購物金額與是否為實驗組、設備、性別與服務的變異數分析(ANOVA)模型。請問，模型中有哪些因子是顯著的？
-請利用 ggplot2 繪製購買金額對應不同服務的盒狀圖 (boxplot)。
+> 這題主要就是要練習`aov`檢定
+
+建立購物金額與是否為實驗組(test)、設備(device)、性別(gender)與服務(service)的變異數分析(ANOVA)模型。請問，模型中有哪些因子是顯著的？
+
+A: __從結果，我們發現，test  device service這些因子，都會顯著影響消費者的購買金額。__
+
+```{r aov檢定，但是沒有交互作用(interaction)}
+analysis.table
+test.formula <- purchase_amount ~ test + device + gender + service ##這邊建立模型的方式與OLS完全一樣
+
+aov.model2 <- aov(test.formula, data = analysis.table)
+summary(aov.model2) ##這邊還要再跑一個`summary`，不然跟ols一樣，你只會看到係數，不會看到顯著水準等等。
+
+```
+
+請利用 ggplot2 繪製購買金額對應不同服務(service)的盒狀圖 (boxplot)。
+
+```{r}
+ggplot(analysis.table) + 
+  geom_boxplot(aes(x=service, y=purchase_amount, color=service)) +
+  coord_cartesian(ylim = c(0, 100)) + 
+  labs(x = "Service", 
+       y="Purchase amount",
+       title = "The Purchase Amount comparison across different service type") + 
+  theme_bw()
+```
+
+
 請進行 Tukey 事後檢定，了解 test 對於購買金額的影響，並繪製信賴區間圖形。
+
+```{r}
+TukeyHSD(aov.model2, "test") #平均而言，若為實驗組的用戶，他們平均的購買金額會比對照組多出了7.22美金，且由上面的aov分析，我們可以知道兩者之間的差距具有統計顯著性。若以圖形來看就是沒有包含到0
+plot(TukeyHSD(aov.model2, "test"))
+```
+
+
 請進行 Tukey 事後檢定，了解 device 對於購買金額的影響，並繪製信賴區間圖形。
+
+```{r}
+TukeyHSD(aov.model2, "device")
+plot(TukeyHSD(aov.model2, "device"))
+#由此我們可以知道，三種裝置的用戶，其實對我們平台的消費能力還是有落差的，其中ios > pc_web > android
+```
+
+
+
 
 
 

@@ -184,10 +184,11 @@ summary(interaction.model)
 
 在課程中我們有介紹過，可以使用 Tukey 事後檢定，回答「平均購買金額差異為多少？」在 R 語言中，我們可以透過 TukeyHSD 函數進行事後檢定，如下所示。
 
-> 也就是test=1/0，實驗組和對照組兩者，在purchase_amount(平均購買金額差異多少)，具體的數字狀況為何？
+> 也就是test=1/0，實驗組和對照組兩者，在purchase_amount(因子所造成的平均購買金額差異多少)，具體的數字狀況(差異程度)為何？
 
 ```{r}
 TukeyHSD(interaction.model, "test")
+plot(TukeyHSD(interaction.model, "test"))
 ```
 
 ```{r}
