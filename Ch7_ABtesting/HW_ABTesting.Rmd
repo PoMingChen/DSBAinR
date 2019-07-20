@@ -106,13 +106,34 @@ analysis.table %>% filter(test == 0) %>% nrow()
 
 ### 題目一
 
-篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
+篩選出屬於日本市場的使用者，針對購買金額進行獨立樣本 t 檢定。
+請問：實驗組的購買金額有沒有顯著高於對照組的購買金額？
 反之，針對購買金額進行獨立樣本 t 檢定，對照組金額有沒有顯著高於實驗組金額？
 請利用 ggplot2 繪製實驗組與對照組購買金額機率密度圖 (density plot)。
 
 ```{r}
 analysis.table
-analysis.table %>% filter(country == "JP")
+analysis.table %>% filter(country == "JP") -> analysis.table.JP
+```
+
+```{r 實驗組的購買金額有沒有顯著高於對照組的購買金額？}
+analysis.table.JP
+analysis.table.JP[analysis.table.JP$test==1, ] ##重點是將實驗組與對照組區分出來
+analysis.table.JP[analysis.table.JP$test==0, ] 
+t.test(x = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異 
+       y = analysis.table.JP[analysis.table.JP$test==0, ]$purchase_amount,
+       alternative = "greater")
+```
+
+
+```{r 對照組的購買金額有沒有顯著高於實驗組的購買金額？}
+t.test(x = analysis.table.JP[analysis.table.JP$test==0, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異 
+       y = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount,
+       alternative = "greater")
+```
+
+```{r}
+
 ```
 
 
