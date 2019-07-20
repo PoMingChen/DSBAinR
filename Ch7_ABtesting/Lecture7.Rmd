@@ -222,6 +222,7 @@ ggplot(daily.purchase, aes(x = date, y = purchase_amount, colour = test)) +
 
 2. 機率分配密度圖
 ```{r}
+test.data
 ggplot(test.data, aes(purchase_amount, fill = test, colour = test)) + #geom_density is for one continuous variable (with kernel base)
   geom_density(alpha = 0.3) +  ##alpha = 1看看會發生什麼事
   xlab("Purchase Amount") + ylab("Density") +
