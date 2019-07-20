@@ -135,6 +135,7 @@ t.test(x = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount, ##我
 答案是對照組的購買金額，有顯著高於實驗組。
 我們可以拒絕H0: `對照組的購買金額沒有顯著高於實驗組的購買金額` 的假設
 ```{r 對照組的購買金額有沒有顯著高於實驗組的購買金額？}
+#若是你將`alternative`係數改成less，結果也是會一樣的。
 t.test(x = analysis.table.JP[analysis.table.JP$test==0, ]$purchase_amount, ##我們是要比他們的購買金額有沒有顯著差異 
        y = analysis.table.JP[analysis.table.JP$test==1, ]$purchase_amount,
        alternative = "greater")
@@ -161,13 +162,13 @@ ggplot(data = analysis.table.JP) +
 
 建立購物金額與是否為實驗組(test)、設備(device)、性別(gender)與服務(service)的變異數分析(ANOVA)模型。請問，模型中有哪些因子是顯著的？
 
-A: __從結果，我們發現，test  device service這些因子，都會顯著影響消費者的購買金額。__
+A: 如何闡釋結果： __從結果，我們發現，test, device, service這些因子，都會顯著影響消費者的購買金額。__
 
 ```{r aov檢定，但是沒有交互作用(interaction)}
-analysis.table
+analysis.table.JP
 test.formula <- purchase_amount ~ test + device + gender + service ##這邊建立模型的方式與OLS完全一樣
 
-aov.model2 <- aov(test.formula, data = analysis.table)
+aov.model2 <- aov(test.formula, data = analysis.table.JP)
 summary(aov.model2) ##這邊還要再跑一個`summary`，不然跟ols一樣，你只會看到係數，不會看到顯著水準等等。
 
 ```
@@ -175,7 +176,7 @@ summary(aov.model2) ##這邊還要再跑一個`summary`，不然跟ols一樣，�
 請利用 ggplot2 繪製購買金額對應不同服務(service)的盒狀圖 (boxplot)。
 
 ```{r}
-ggplot(analysis.table) + 
+ggplot(analysis.table.JP) + 
   geom_boxplot(aes(x=service, y=purchase_amount, color=service)) +
   coord_cartesian(ylim = c(0, 100)) + 
   labs(x = "Service", 
