@@ -1,0 +1,67 @@
+---
+title: "hw_4_PCA"
+author: "PoMingChen"
+date: "7/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Env setting
+```{r}
+library(tidyverse)
+```
+
+```{r}
+#read as tibble
+financial.data <- read_csv("./2017_financial%20index_163%20comp.csv")
+```
+
+```{r}
+# financial.data %>% class()
+```
+
+讓我們來看看「財務資料集合」資料集合，你會發現所有比率的資料都是以 (%) 方式呈現。由於我們會「標準化」後再進行 PCA，所以此時不需要將這些比率除以 100。
+```{r}
+head(financial.data)
+```
+
+
+## EDA
+
+> `summary` and `cor` are always used in EDA
+
+```{r}
+# financial.data[, 2:ncol(financial.data)] the [bracket] in tibble will output a tibble, and the $ dollar sign will output the vector.
+summary(financial.data[, 2:ncol(financial.data)])
+# class(summary(financial.data[, 2:ncol(financial.data)])) ## table
+
+```
+
+```{r}
+cor(financial.data[, 2:ncol(financial.data)])
+# class(cor(financial.data[, 2:ncol(financial.data)])) ## matrix
+```
+
+我通常喜歡使用 __熱圖 (heatmap)__ 視覺化變數間的相關程度，如果要使用 ggplot2 繪製相關係數的熱圖，必須先將資料整理成 tidy 的「變數 1 - 變數 2 - 相關係數」資料架構。我們可以利用 reshape2套件中的melt函數輕鬆把矩陣格式轉換成 tidy 資料。
+
+> 熱圖：`geom_tile`
+
+```{r}
+library(reshape2)
+```
+
+```{r}
+#melt, Convert an object into a molten data frame.
+head(melt(cor(financial.data[, 2:ncol(financial.data)])))
+```
+
+[reference link](https://stackoverflow.com/questions/26536251/comparing-gather-tidyr-to-melt-reshape2)
+
+```{r}
+#use gather to duplicate the same result as melt function
+
+```
+
