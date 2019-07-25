@@ -45,7 +45,7 @@ cor(financial.data[, 2:ncol(financial.data)])
 # class(cor(financial.data[, 2:ncol(financial.data)])) ## matrix
 ```
 
-我通常喜歡使用 __熱圖 (heatmap)__ 視覺化變數間的相關程度，如果要使用 ggplot2 繪製相關係數的熱圖，必須先將資料整理成 tidy 的「變數 1 - 變數 2 - 相關係數」資料架構。我們可以利用 reshape2套件中的melt函數輕鬆把矩陣格式轉換成 tidy 資料。
+我通常喜歡使用 __熱圖 (heatmap)__ 視覺化變數間的相關程度，如果要使用 ggplot2 繪製相關係數的熱圖，必須先將資料整理成 tidy 的「變數 1 - 變數 2 - 相關係數」資料架構。我們可以利用 reshape2套件中的`melt`函數輕鬆把矩陣格式轉換成 tidy 資料。
 
 > 熱圖：`geom_tile`
 
@@ -66,9 +66,9 @@ melt(cor(financial.data[, 2:ncol(financial.data)])) -> financial.data.cor.melt
 
 `melt`和`gather`，是一組，`cast`和`spread`是一組。
 
-之前學的是`gather`和`spread`一組，然後`separate`和`unite`一組。
-
 前面這組，是將寬的轉成長的。後面這組，是將長的轉成寬的。
+
+> 之前學的是`gather`和`spread`一組，然後`separate`和`unite`一組。
 
 那`melt`本身是設定如果沒有`id_variable`的話，就會把全部的col壓縮到row裡面，如果你有設定`id_variable`的話，基本上就是和gather的`-c()`是相同的方式。
 
@@ -132,15 +132,232 @@ class(pca.model$rotation)
 
 ```{r}
 pca.info <- tibble(
-  PC_X = paste("PC_", c(1:length(pca.model$sdev)), sep = ""),
-  sdev = pca.model$sdev^2,
-  #prop
-  #cum.prop
   
-  # cum.sdev = for (variable in vector) {
-  #                    
-  #                  }
+  PC_X = paste0("PC_", formatC(1:16, width=2, flag="0")),
+  var = pca.model$sdev^2,
+  
+  prop = (pca.model$sdev^2)/sum(pca.model$sdev^2),
+  
+  cum.prop = cumsum(prop) #the cumsum function is really a basic.
+     
   )
 pca.info
+```
+
+#### plotly the cum proportion
+
+```{r}
+library(plotly)
+pca.info
+```
+
+```{r}
+plot_ly(
+  x = pca.info$PC_X,
+  y = pca.info$var,
+  type = "bar"
+) %>%
+  layout(
+    title = "Variance Explained by Each Principal Component",
+    xaxis = list(type = 'Principal Component', tickangle = -60),
+    yaxis = list(title = 'Variance'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
+
+```{r}
+plot_ly(
+  x = pca.info$PC_X,
+  y = pca.info$cum.prop,
+  type = "bar"
+) %>%
+  layout(
+    title = "Variance Explained by Each Principal Component",
+    xaxis = list(type = 'Principal Component', tickangle = -60),
+    yaxis = list(title = 'Variance'),
+    margin = list(r = 50, t = 50, b = 70, l = 100)
+  )
+```
+
+在完成觀察究竟要留幾個組成分後，就要去看主成份係數矩陣的係數了，來闡釋各個組成份對應的究竟是怎麼樣的能力，以及他跟哪幾個原始變數較有相關性（係數絕對值越大越好，表示正相關越強，或者負相關越強）
+
+## 主成份係數矩陣分析
+```{r}
+head(pca.model$rotation, 5)
+```
+
+在這裡，我們使用跟共變異數矩陣一樣的視覺化方法。(heatmap)
+```{r}
+# melt(pca.model$rotation[, 1:6]),  check it again if needed.
+ggplot(melt(pca.model$rotation[, 1:6]), aes(Var2, Var1)) + ##rotation[1:6]means the PC1~PC6
+  geom_tile(aes(fill = value), colour = "white") +
+  scale_fill_gradient2(low = "firebrick4", high = "steelblue",
+                       mid = "white", midpoint = 0) +
+  guides(fill=guide_legend(title="Coefficient")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.title = element_blank())
+```
+
+
+#### 非負稀疏主成份分析
+
+> 這邊的分析內容就跟上面的相差無幾，主要就是多了一個非負稀疏解的概念
+
+我們發現上面的主成份其實很難解釋（跟很多變數相關，有解釋等於沒有解釋），所以改採用非負稀疏主成份分析，可以利用` nsprcomp` 套件中的 `nscumcomp` 完成，其中有兩個重要的參數：
+
+`k`：非 0 係數個數，通常是「每個主成份期待非 0 係數個數」* 變數個數
+
+> 我期待我的「每個主成份期待非0係數個數是5個」*16個財務比率變數 = 80
+
+`nneg`：是否希望所有係數都非負，TRUE 代表有非負限制
+
+```{r}
+set.seed(1234)
+library(nsprcomp)
+nspca.model <- nscumcomp(
+  financial.data[, 2:17], 
+  k = 90, nneg = T,
+  scale. = T) #scale. 一樣是for標準化
+```
+
+```{r}
+var.exp <- tibble(
+  pc = paste0("PC_", formatC(1:16, width=2, flag="0")),
+  var = nspca.model$sdev^2,
+  prop = (nspca.model$sdev)^2 / sum((nspca.model$sdev)^2),
+  cum_prop = cumsum((nspca.model$sdev)^2 / sum((nspca.model$sdev)^2)))
+
+head(var.exp)
+```
+
+這邊你設定非負稀疏條件之後，你會發現PC_X的資料變異降低了，這符合直覺，我今天不額外加入其他限制式，我的主成份估計分數肯定是會讓我的資料變異，在每一個主成分都達到最大化（且需要滿足基礎限制式: 第i個主成份，與前面（i-1）個主成份無關），那你額外加了條件之後，自然就變成local解了，自然PC_X能捕捉到的資歷變異就不是百分知百地發揮它的潛力（極值），所以要捕捉相同80%的總變異量，這時候就需要留下8個。
+
+
+```{r}
+library(plotly)
+
+plot_ly(
+  x = var.exp$pc,
+  y = var.exp$var,
+  type = "bar"
+) %>%
+  layout(
+    title = "Variance Explained by Each Principal Component",
+    xaxis = list(type = 'Principal Component', tickangle = -60),
+    yaxis = list(title = 'Variance'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
+
+```{r}
+plot_ly(
+  x = var.exp$pc,
+  y = var.exp$cum_prop,
+  type = "bar"
+) %>%
+  layout(
+    title = "Cumulative Proportion by Each Principal Component",
+    xaxis = list(type = 'Principal Component', tickangle = -60),
+    yaxis = list(title = 'Proportion'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
+
+接下來，讓我們看看非負稀疏主成份的係數權重。從熱圖中可以看到：
+
+* 主成份 1 重點為「股東權益獲利與成長能力」
+* 主成份 2 重點為「資產獲利能力」
+* 主成份 3 重點為「毛利與週轉率」
+* 主成份 4 重點為「資產週轉與獲利能力」
+* 主成份 5 重點為「營業利益成長率與速動能力」
+* 主成份 6 重點為「存貨週轉率與現金週轉能力」
+* 主成份 7 重點為「毛利與營收成長狀況」
+* 主成份 8 重點為「毛利與營業費用狀況」
+
+```{r}
+# nspca.model$rotation[, 1:8]
+ggplot(melt(nspca.model$rotation[, 1:8]), aes(Var2, Var1)) +
+  geom_tile(aes(fill = value), colour = "white") +
+  scale_fill_gradient2(low = "white", high = "steelblue") +
+  guides(fill=guide_legend(title="Coefficient")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        axis.title = element_blank())
+```
+
+
+## 個別公司分析
+
+在這裡教大家一個找出特別公司的方法，就是繪製「主成份分數（e.g.PC1）」與「該主成份係數最大變數（e.g.ROE in PC1）」的散佈圖。比如說下圖中，可以找出幾種特別怪異的公司：
+
+給定 ROE，PC 1 特別卓越：6684安格
+
+> 這樣的想法在於，相同ROE表現下的公司（表示ROC大家的貢獻度相同），但是這家公司的PC1特別的漂亮，言下之意他還有其他一兩個項目（跟PC1很有關的），該公司的那個變數值也特別得好，才有可能做到，因此他勢必有一些隱藏的優點。
+
+給定 PC1，ROE 超級低：6291沛亨
+
+> 這樣的想法在於，相同PC1，也就是大家整體表現（在某一個能力上）一樣，即是PC1數值相同，但是最主要的貢獻者（背後的變數ROE，卻可以用比較低的數字就做到相同的好表現），鐵定有其他也跟PC1很有關的財務比率變數也表現得相當不錯，才有可能做到。
+
+```{r}
+
+nspca.score <- data.frame(nspca.model$x)
+row.names(nspca.score) <- financial.data$comp_id
+
+plot_ly(
+  x = nspca.score[, 1],
+  y = financial.data$roe,
+  text = financial.data$comp_id,
+  type = "scatter",
+  mode = "markers"
+) %>% layout(
+    title = "ROE v.s. PC 1 Score: Scatter Plot",
+    xaxis = list(title = 'Principal Component 1'),
+    yaxis = list(title = 'Return on Equity'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
+
+另外，透過不同主成份的散佈圖，也可以找到再多種面向都很傑出的公司（就類似Biplot可以借此觀察分群等等）：
+
+> 如此一來你可以自己建立，你心目中哪方面財務比率表現較為優秀的公司進行長期關注。
+
+3529力旺、6643丹星、6684安格在「資產獲利能力」與「毛利與週轉率」都特別傑出，值得關注。
+```{r}
+plot_ly(
+  x = nspca.score[, 2],
+  y = nspca.score[, 3],
+  text = financial.data$comp_id,
+  type = "scatter",
+  mode = "markers"
+) %>% layout(
+    title = "PC 2 v.s. PC 3 Score: Scatter Plot",
+    xaxis = list(title = 'Principal Component 2'),
+    yaxis = list(title = 'Principal Component 3'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
+
+
+由
+PC4 「資產週轉與獲利能力」
+PC5 「營業利益成長率與速動能力」
+來看，2337旺宏可謂是一支獨秀。
+
+```{r}
+
+plot_ly(
+  x = nspca.score[, 4],
+  y = nspca.score[, 5],
+  text = financial.data$comp_id,
+  type = "scatter",
+  mode = "markers"
+) %>% layout(
+    title = "PC 4 v.s. PC 5 Score: Scatter Plot",
+    xaxis = list(title = 'Principal Component 4'),
+    yaxis = list(title = 'Principal Component 5'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
 ```
 
