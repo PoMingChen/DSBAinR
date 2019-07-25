@@ -1,0 +1,58 @@
+---
+title: "try to know reshape and tidy"
+author: "PoMingChen"
+date: "7/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Air quality example
+
+```{r}
+library(reshape2)
+library(tidyr)
+library(dplyr, warn.conflicts = FALSE)
+library(knitr)
+airquality
+```
+
+```{r}
+names(airquality) <- tolower(names(airquality))
+
+airquality %>% head() %>% kable(row.names = FALSE)
+```
+
+### Monthly mean with reshape2
+```{r}
+aqm <- airquality %>% 
+    melt(id=c("month", "day"), na.rm=TRUE)
+aqm
+
+# aqm2 <- airquality %>% 
+#     melt( na.rm=TRUE) #No id variables; using all as measure variables. the month and the day are all included.
+# 
+# aqm2
+
+aqm %>% 
+    dcast(month + day ~ variable, 
+          fun.aggregate = mean, ##The ... let’s you pass on additional arguments to your fun.aggregate function, here mean.
+          margins = (c("month", "variable"))) %>%
+    kable()
+```
+
+### Monthly mean with tidyr and dplyr
+```{r}
+airquality
+aqg <- airquality %>% 
+    gather(variable, value, -month, -day, na.rm = TRUE) 
+aqg
+aqg %>% 
+    group_by(month, variable) %>%
+    summarise(value = mean(value)) %>%
+    spread(variable, value) %>%
+    kable()
+```
+
