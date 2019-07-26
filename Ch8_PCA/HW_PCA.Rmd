@@ -16,18 +16,21 @@ knitr::opts_chunk$set(echo = TRUE)
 設置工作路徑，並確定資料集合放置在你的工作路徑：
 setwd("你的完整工作路徑名稱")
 檔案的編碼皆為UTF-8，讀取檔案時請注意：
-### 讀成data.frame
+#### 讀成data.frame
 `read.csv('檔案名稱', encoding = 'UTF-8')`
-### 讀成tibble
+#### 讀成tibble
 `read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
 為了避免程式中的隨機效果造成答案不一致，請將隨機種子設置為500：
 `set.seed(500)`
+
+## 環境設置
 
 ```{r}
 library(tidyverse)
 library(magrittr)
 library(reshape2)
 library(nsprcomp)
+library(plotly)
 set.seed(500)
 ```
 
@@ -35,8 +38,6 @@ set.seed(500)
 ```{r}
 read_csv("./2017_financial%20index_163%20comp.csv", 
           locale = locale(encoding = "UTF-8")) -> financial.data2
-
-financial.data2 %>% colnames()
 ```
 
 
@@ -63,29 +64,32 @@ financial.data2
 - 請繪製 ROA 變數的直方圖
 ```{r 小題三ROA變數直方圖}
 #直方圖，for continuous_x_variable
-ggplot(financial.data2, aes(x=financial.data2$roe))  + geom_histogram(binwidth = 5)
+ggplot(financial.data2, aes(x=financial.data2$roa))  + geom_histogram()
 ```
 
 - 定義新變數`t_roa = exp(roa/10) / (1+exp(roa/10))`，並繪製直方圖。比較兩者的差別，你發現了什麼？
 
-A: 我發現做了`t_roa`之後，取了exponential，因此所有的roa值都變成正的，同時整個資料的分配狀況也比較smooth。
+A: 我發現做了`t_roa`之後，取了exponential，整個資料的分配狀況也比較smooth（接近常態）。
 
-```{r 第四小題}
+```{r 計算轉換過roa}
 financial.data2 %<>% mutate(t_roa = exp(roa/10) / (1+exp(roa/10))) 
 ```
 
-```{r}
+```{r 轉換過roa繪圖}
 financial.data2 %>% ggplot(data = ., aes(x=financial.data2$t_roa)) + 
-  geom_histogram(bidwidth = 5)
+  geom_histogram()
 ```
 
 ## 題目二
 
 1. 利用前面新增三個變數的資料集合，進行非負稀疏主成份分析。設定 k 值為 100，`繪製解釋變異數比率圖型`，請問需要多少個主成份才能夠解釋超過七成的變異？
 
+> 第一小題在考你，如何操作挑選適合主成份分析個數的過程。
+
 Answer: PC1~PC7，七個，資料累積變異量0.7241711	
 
-```{r}
+```{r 執行PCA模型估計}
+financial.data2
 nsprcompmodel2 <- financial.data2[, 2:ncol(financial.data2)] %>% 
   nscumcomp(x = ., 
             k=100,
@@ -93,11 +97,11 @@ nsprcompmodel2 <- financial.data2[, 2:ncol(financial.data2)] %>%
             scale. = T) ##PCA is always needed to scale.
 ```
 
-```{r}
+```{r PCA model summary}
 summary(nsprcompmodel2)
 ```
 
-```{r}
+```{r 計算PC_X累積解釋總變異}
 nsprcompmodel2.table <- tibble( ##to build a tibble, use `tibble` not `as_tibble` 
   PC_x = paste0("PC_", formatC(1:19, width = 2, flag="0")),
   variance = (nsprcompmodel2$sdev)^2,
@@ -107,7 +111,7 @@ nsprcompmodel2.table <- tibble( ##to build a tibble, use `tibble` not `as_tibble
 nsprcompmodel2.table
 ```
 
-```{r}
+```{r 繪圖觀察要留下幾個PC}
 nsprcompmodel2.table %>%
   ggplot(data = ., aes(x=nsprcompmodel2.table$PC_x, 
                        y=nsprcompmodel2.table$cum_prop)) +
@@ -118,7 +122,69 @@ nsprcompmodel2.table %>%
 
 2/ 根據上題選出的個數，繪製主成份係數矩陣的熱圖 (heatmap)。第一與第二主成份最重要的影響變數是哪些？
 
-3. 繪製主成份 1 與主成份 2 分數的散佈圖，請在平面上找出一間你認為表現最好的公司，在網路上搜尋他今年3月20至4月20的股票表現。
+Answer: 
+
+第一組成分最重要的影響變數是：sales_margin_rate，淨收益佔淨銷售的比率
+第二組成分最重要的影響變數是：op_profit_growth_rate，稅前淨利成長率
+
+```{r 取出主成份coefficient}
+melt(nsprcompmodel2$rotation)
+```
+
+```{r 繪圖觀察變數與主成份關聯性}
+ggplot(melt(nsprcompmodel2$rotation), aes(x=Var2, y=Var1)) + 
+  geom_tile(aes(fill=value), color="white") + 
+  scale_fill_gradient2(low = "firebrick4",
+                      high = "steelblue",
+                      mid = "white",
+                      midpoint = 0) + 
+  guides(fill=guide_legend(title = "Coefficient")) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    axis.title = element_blank()) -> nsprc.coefficient.graph
+nsprc.coefficient.graph %>% ggplotly()
+```
+
+3. 繪製主成份 1 與主成份 2 __分數__的散佈圖，請在平面上找出一間你認為表現最好的公司，在網路上搜尋他今年3月20至4月20的股票表現。
+
+Answer: 依照各個公司在PC1 PC2上面的主成份分數，表現最好的應該是2337(旺宏)，或者6684(安格)也不錯。
+
+以旺宏為例：2019/03/20~2019/04/20 股價由21.4上漲到23.45(上漲2.05元，9.8%)
+
+```{r 取出各個公司的主成分分數之矩陣}
+# nsprcompmodel2$rotation 
+##this is about the PCA an the variable (the estimated coefficient from variable to PC_X)
+
+# nsprcompmodel2$center 
+##same as summary(financial.data2[2:20]) to check the mean of the variables.
+
+# nsprcompmodel2$x 
+## is the PC score of 162 companies.
+nsprcompmodel2$x -> nsprcompmodel2.table.companies
+```
+
+```{r 重新整理表格}
+nsprcompmodel2.table.companies %<>% as.tibble() %>%
+  mutate(company_id = financial.data2$comp_id)  %>%
+  select(company_id, everything()) -> nsprcompmodel2.table.companies
+
+nsprcompmodel2.table.companies
+```
+
+```{r 觀察PC1 PC2的散步圖找出該兩個面向較佳的公司}
+nsprcompmodel2.table.companies %>% 
+ plot_ly(data = .,
+         x = nsprcompmodel2.table.companies$PC1,
+         y = nsprcompmodel2.table.companies$PC2,
+         text = nsprcompmodel2.table.companies$company_id,
+         type = "scatter",
+         mode = "markers"
+ )  %>% layout(
+    title = "PC 1 v.s. PC 2 Score: Scatter Plot",
+    xaxis = list(title = 'Principal Component 1'),
+    yaxis = list(title = 'Principal Component 2'),
+    margin = list(r = 30, t = 50, b = 70, l = 50)
+  )
+```
 
 
 
