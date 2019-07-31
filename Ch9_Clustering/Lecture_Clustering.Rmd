@@ -16,6 +16,7 @@ library(tidyverse)
 library(knitr)
 library(reshape2)
 library(magrittr)
+library(ggfortify)
 ```
 
 ```{r}
@@ -241,7 +242,74 @@ ClusterResultForPlot2 %>%
 ```
 
 ## 「各群體」轉回原始變數值
-```{r}
 
+> 這邊只是用一個很簡單的方式，就是把Kmeans的分群結果，貼回去有原始值的GameTable而已，這樣就可以進行原始值的畫圖，「阿他們究竟買多少？」
+
+```{r}
+GameTable %>% cbind(., K2$cluster) -> GameTableResult
+colnames(GameTableResult)[ncol(GameTableResult)] <- "Cluster"
+GameTableResult 
+```
+
+延續上面敘述：
+
+若是有分成四群，就會比較好看出分群：
+
+1. 第一群的玩家較多是新手，常常在下午玩，但是沒有顯著的購買行為。
+2. 第二群的玩家較多是一般玩家，常常在晚上玩，且常常買金幣
+3. 第三群的玩家比例較少，有一定比例的老手，常常在晚上玩，且常常買卡片
+4. 第四群的玩家較多是老手，常常在半夜玩，且常常買鑽石
+
+```{r}
+GameTableResult %>% ggplot(data = ., aes(x=Identity)) + 
+  geom_bar(stat = "count") + facet_wrap(~Cluster)
+```
+
+若去觀察使用者使用的電信商：
+
+1. 第一群的玩家較多是使用ABC，常常在下午玩，但是沒有顯著的購買行為
+2. 第二群的玩家較多是使用非ABC，常常在晚上玩，且常常買金幣
+3. 第三群的玩家較多是使用非ABC，有一定比例的老手，常常在晚上玩，且常常買卡片
+4. 第四群的玩家較多是使用非ABC，常常在半夜玩，且常常買鑽石
+
+```{r}
+GameTableResult %>% ggplot(data = ., aes(x=Telecom)) + 
+  geom_bar(stat = "count") + facet_wrap(~Cluster)
+```
+
+## 分群結果的視覺化 - 納入主成份分析
+
+```{r}
+#用標準化資料進行autoplot確實是比較好的選擇。（比沒有標準化的資料優）
+set.seed(500)
+autoplot(kmeans(GameTable2[,1:6], 4), data  = GameTable2)
+```
+
+## 針對遊戲營運提出建議
+
+延續上面敘述：
+
+若是有分成四群，就會比較好看出分群：
+
+1. 第一群的玩家較多是新手，常常在下午玩，但是沒有顯著的購買行為。
+
+建議：可以提出首購促銷方案
+ 
+2. 第二群的玩家較多是一般玩家，常常在晚上玩，且常常買金幣
+
+建議：是一般玩家，看看可否增加他們的總遊戲時間，好比說總共遊玩小時數獎勵
+
+3. 第三群的玩家比例較少，有一定比例的老手，常常在晚上玩，且常常買卡片
+
+建議：也許可以採組合銷售，或者加價購買其他鑽石，或者金幣，來促進客單價。
+
+4. 第四群的玩家較多是老手，常常在半夜玩，且常常買鑽石
+
+建議：既然是老手，而且都買鑽石這種高單價的商品，可以考慮推出邀請朋友相關獎勵優惠。
+
+```{r}
+ClusterResultForPlot2 %>% 
+  ggplot(data = ., aes(x=Continuous_Variable2, y=Normalized_Value2)) + 
+  geom_boxplot(size=0.5) + facet_wrap(~ClusterResultForPlot2$Cluster2)
 ```
 
