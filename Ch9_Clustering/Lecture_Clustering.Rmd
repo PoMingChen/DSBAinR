@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Data Cleaning
 
-```{r}
+```{r load the package}
 library(tidyverse)
 library(knitr)
 library(reshape2)
@@ -45,7 +45,7 @@ kable(UserTable[1:10,])
 將遊戲記錄以及會員資訊以`User_Id`進行`inner_join`
 > 一個User_Id會有五個紀錄，是因為這些資料是過去五天以來所紀錄的資料，因此有五筆。也因此要將這五天的資料取平均再來做分析。
 
-```{r}
+```{r average the performace in last five day}
 Gamelog %>% group_by(User_Id) %>%
   summarise(Min_Aft = mean(Min_Aft),
             Min_Eve = mean(Min_Eve),
@@ -60,7 +60,6 @@ Gamelog %>% group_by(User_Id) %>%
 GameTable %>% summary() ## summary() and cor() are the inevitable functions in EDA
 ```
 
-
 ## Calculate the distance
 
 > 首先你要會標準化，以及虛擬變數轉換
@@ -72,8 +71,7 @@ GameTable %>% summary() ## summary() and cor() are the inevitable functions in E
 在這邊利用`mutate()`函數轉換數值變數，清楚且快速達到我們想要做的事
 
 #### 數值變數標準化
-```{r}
-GameTable 
+```{r normalized the numeric variable}
 GameTable %>% mutate(
   Aft = (Min_Aft - min(Min_Aft))/(max(Min_Aft)-min(Min_Aft)),
   Eve = (Min_Eve - min(Min_Eve))/(max(Min_Eve)-min(Min_Eve)),
@@ -86,24 +84,24 @@ GameTable %>% mutate(
 GameTable %<>% select(1:7, 10:15, everything()) 
 ```
 
-```{r}
-# kable(GameTable)
-```
-
 #### 類別變數轉換
 
-```{r}
+```{r dummize the factor variables}
 GameTable %>%
   model.matrix( ~ Identity + Telecom, data = .) -> GameTableBinary
 
-GameTable ##intercept本質上就是有點累贅，因為若是二元變數，則非1即0，反之若為三元變數（就只需要1 0 或者 0 1，那若皆為0 0，則會是最一開始的benckmark，因此我們可以將intercept給去除。
+##intercept本質上就是有點累贅，因為若是二元變數，則非1即0，反之若為三元變數（就只需要1 0 或者 0 1，那若皆為0 0，則會是最一開始的benckmark，因此我們可以將intercept給去除。
 ```
 
-```{r}
+```{r the ready table to be analyzed}
+#Normalized and dummy variables is done
 GameTable %>% cbind(GameTableBinary[,2:4]) -> GameTable
 ```
 
 ## EDA
+
+> the very basic EDA: `cor`
+
 
 ```{r}
 GameTable %>% select(8:13, 16:18) -> GameTable2
@@ -173,7 +171,7 @@ ClusterResult
 table(ClusterResult$Cluster) ##群體1 2 3 -> 253 445 222
 ```
 
-接著探討個群體間的連續變數分配，為了將資料轉換成整齊的格式，這邊會用到`gather()`函數將所有的variables併入同一個欄位裡面
+接著探討個群體間的 __連續變數(the continuous variables)__分配，為了將資料轉換成整齊的格式，這邊會用到`gather()`函數將所有的variables併入同一個欄位裡面
 
 ```{r}
 ClusterResult %>% gather(
@@ -243,7 +241,7 @@ ClusterResultForPlot2 %>%
 
 ## 「各群體」轉回原始變數值
 
-> 這邊只是用一個很簡單的方式，就是把Kmeans的分群結果，貼回去有原始值的GameTable而已，這樣就可以進行原始值的畫圖，「阿他們究竟買多少？」
+> 這邊只是用一個很簡單的方式，就是把Kmeans的分群結果，貼回去有原始值的GameTable而已，這樣就可以進行原始值的畫圖，「那這些群體都是怎麼樣的較多？」，「阿他們究竟買多少？」
 
 ```{r}
 GameTable %>% cbind(., K2$cluster) -> GameTableResult
@@ -255,10 +253,10 @@ GameTableResult
 
 若是有分成四群，就會比較好看出分群：
 
-1. 第一群的玩家較多是新手，常常在下午玩，但是沒有顯著的購買行為。
-2. 第二群的玩家較多是一般玩家，常常在晚上玩，且常常買金幣
-3. 第三群的玩家比例較少，有一定比例的老手，常常在晚上玩，且常常買卡片
-4. 第四群的玩家較多是老手，常常在半夜玩，且常常買鑽石
+1. 第一群的玩家 __較多是新手__，常常在下午玩，但是沒有顯著的購買行為。
+2. 第二群的玩家 __較多是一般玩家__，常常在晚上玩，且常常買金幣
+3. 第三群的玩家 __比例較少__，有一定比例的老手，常常在晚上玩，且常常買卡片
+4. 第四群的玩家 __較多是老手__，常常在半夜玩，且常常買鑽石
 
 ```{r}
 GameTableResult %>% ggplot(data = ., aes(x=Identity)) + 
@@ -267,10 +265,10 @@ GameTableResult %>% ggplot(data = ., aes(x=Identity)) +
 
 若去觀察使用者使用的電信商：
 
-1. 第一群的玩家較多是使用ABC，常常在下午玩，但是沒有顯著的購買行為
-2. 第二群的玩家較多是使用非ABC，常常在晚上玩，且常常買金幣
-3. 第三群的玩家較多是使用非ABC，有一定比例的老手，常常在晚上玩，且常常買卡片
-4. 第四群的玩家較多是使用非ABC，常常在半夜玩，且常常買鑽石
+1. 第一群的玩家 __較多是使用ABC__，常常在下午玩，但是沒有顯著的購買行為
+2. 第二群的玩家 __較多是使用非ABC__，常常在晚上玩，且常常買金幣
+3. 第三群的玩家 __較多是使用非ABC__，有一定比例的老手，常常在晚上玩，且常常買卡片
+4. 第四群的玩家 __較多是使用非ABC__，常常在半夜玩，且常常買鑽石
 
 ```{r}
 GameTableResult %>% ggplot(data = ., aes(x=Telecom)) + 
@@ -278,6 +276,8 @@ GameTableResult %>% ggplot(data = ., aes(x=Telecom)) +
 ```
 
 ## 分群結果的視覺化 - 納入主成份分析
+
+> 我其實覺得不太知道要怎麼去詮釋他，除了我知道由9的原始變數壓縮出來的PCA 1 2可以解釋90%的變異，同時看得出分成4群效果其實滿好的，僅此而已？
 
 ```{r}
 #用標準化資料進行autoplot確實是比較好的選擇。（比沒有標準化的資料優）
