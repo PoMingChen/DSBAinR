@@ -114,7 +114,8 @@ GameTable2 %>% cor() %>% melt() -> Cor.Matrix
 Cor.Matrix
 ```
 
-```{r}
+以下兩種大同小異
+```{r 用labs去掉不必要的var標示}
 Cor.Matrix %>% ggplot(data = ., aes(x=Var1, y=Var2)) + 
   geom_tile(aes(fill=value)) + 
   scale_fill_gradient2(low = "firebrick4",
@@ -122,6 +123,125 @@ Cor.Matrix %>% ggplot(data = ., aes(x=Var1, y=Var2)) +
                        mid = "white",
                        midpoint = 0) + 
   guides(fill=guide_legend("Correlation Coefficient")) + 
-  theme(axis.title.x = element_text(hjust = 1, vjust = 1, angle = 45))
+  labs(x = "", y="")+
+  theme(axis.text.x = element_text(hjust = 1, vjust = 1, angle = 45))
+```
+
+```{r 用axis.title=element_bank()去掉不必要的var標示}
+Cor.Matrix %>% ggplot(data = ., aes(x=Var1, y=Var2)) + 
+  geom_tile(aes(fill=value)) + 
+  scale_fill_gradient2(low = "firebrick4",
+                       high = "steelblue",
+                       mid = "white",
+                       midpoint = 0) + 
+  guides(fill=guide_legend("Correlation Coefficient")) + 
+  theme(axis.text.x = element_text(hjust = 1, vjust = 1, angle = 45),
+        axis.title = element_blank())
+```
+
+## Clustering 
+
+接著我們選擇用階層式集群分析作為資料探索的方法，利用`dist()`函數計算距離後，再用`hclust()`函數進行分析及繪圖。
+
+觀察此圖，我們可以發現，玩家大致上可以被分為3到4個群體，因此以下的建模將以這3、4兩種群數分別討論。
+```{r}
+set.seed(500)
+Distance <- dist(GameTable2, method = 'euclidean') ##euclidean means 歐幾里德
+Distance
+hclust(Distance, method = 'complete') %>% plot()
+```
+
+## Modeling
+
+### 3 groups
+用`kmeans()`演算法，決定分群數目後、進行分群後，先看看各個群體中的玩家數量
+```{r}
+set.seed(500)
+K <- kmeans(GameTable2, centers = 3)
+K$cluster %>% class() ##各個樣本最終被分配到哪一群
+```
+
+```{r}
+GameTable2 %>% cbind(., K$cluster) -> ClusterResult
+ClusterResult
+colnames(ClusterResult)[ncol(ClusterResult)] <- "Cluster"
+ClusterResult
+```
+
+```{r}
+table(ClusterResult$Cluster) ##群體1 2 3 -> 253 445 222
+```
+
+接著探討個群體間的連續變數分配，為了將資料轉換成整齊的格式，這邊會用到`gather()`函數將所有的variables併入同一個欄位裡面
+
+```{r}
+ClusterResult %>% gather(
+  key = Continuous_Variable,
+  value = Normalized_Value,
+  -c(IdentityNovice, IdentityVeteran, Telecomother, Cluster)
+) -> ClusterResultForPlot
+```
+
+```{r}
+ClusterResultForPlot$Continuous_Variable <- factor(ClusterResultForPlot$Continuous_Variable,
+       levels = c("Mid", "Aft", "Eve","Coin","Dia","Car"))
+```
+
+```{r}
+ClusterResultForPlot %>% 
+  ggplot(data = ., aes(x=Continuous_Variable, y=Normalized_Value)) + 
+  geom_boxplot(size=0.5) + facet_wrap(~ClusterResultForPlot$Cluster)
+#第一群的人，有較高傾向會在下午玩，但是購買的行為看起來並不顯著。
+#第二群的人，有較高傾向會在晚上玩，而買Coin的行為比較明顯（顯著優於其他鑽石和卡片）
+#第三群的人，其實就範圍滿廣的，有點不知怎麼定義其行為
+```
+
+
+### 4 groups
+```{r}
+set.seed(500)
+K2 <- kmeans(GameTable2, centers = 4)
+K2$cluster
+```
+
+```{r}
+GameTable2 %>% cbind(., K2$cluster) -> ClusterResult2
+colnames(ClusterResult2)[ncol(ClusterResult2)] <- "Cluster2"
+ClusterResult2
+```
+
+```{r}
+table(ClusterResult2$Cluster)
+```
+
+```{r}
+ClusterResult2 %>% gather(
+  key = Continuous_Variable2,
+  value = Normalized_Value2,
+  -c(IdentityNovice, IdentityVeteran, Telecomother, Cluster2)
+) -> ClusterResultForPlot2
+```
+
+```{r}
+ClusterResultForPlot2$Continuous_Variable2 <- factor(ClusterResultForPlot2$Continuous_Variable2,
+       levels = c("Mid", "Aft", "Eve","Coin","Dia","Car"))
+```
+
+若是有分成四群，就會比較好看出分群：
+
+1. 第一群的玩家多是在下午玩，但是沒有顯著的購買行為
+2. 第二群的玩家，常常在晚上玩，且常常買金幣
+3. 第三群的玩家，常常在晚上玩，且常常買卡片
+4. 第四群的玩家，常常在半夜玩，且常常買鑽石
+
+```{r}
+ClusterResultForPlot2 %>% 
+  ggplot(data = ., aes(x=Continuous_Variable2, y=Normalized_Value2)) + 
+  geom_boxplot(size=0.5) + facet_wrap(~ClusterResultForPlot2$Cluster2)
+```
+
+## 「各群體」轉回原始變數值
+```{r}
+
 ```
 
