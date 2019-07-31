@@ -9,22 +9,119 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Data Cleaning
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(tidyverse)
+library(knitr)
+library(reshape2)
+library(magrittr)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+Gamelog <- read_csv("./Game_Log.csv")
+UserTable <- read_csv("./User_Table.csv")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+Gamelog %>% class()
+UserTable %>% class()
+```
+
+```{r}
+Gamelog %>%
+  str()
+
+UserTable %>% 
+  str()
+```
+
+```{r}
+kable(Gamelog[1:10,])
+kable(UserTable[1:10,])
+```
+
+將遊戲記錄以及會員資訊以`User_Id`進行`inner_join`
+> 一個User_Id會有五個紀錄，是因為這些資料是過去五天以來所紀錄的資料，因此有五筆。也因此要將這五天的資料取平均再來做分析。
+
+```{r}
+Gamelog %>% group_by(User_Id) %>%
+  summarise(Min_Aft = mean(Min_Aft),
+            Min_Eve = mean(Min_Eve),
+            Min_Mid = mean(Min_Mid),
+            Buy_Coin = mean(Buy_Coin),
+            Buy_Dia = mean(Buy_Dia),
+            Buy_Car = mean(Buy_Car)
+            ) %>% inner_join(x=., y=UserTable, by="User_Id") -> GameTable
+```
+
+```{r}
+GameTable %>% summary() ## summary() and cor() are the inevitable functions in EDA
+```
+
+
+## Calculate the distance
+
+> 首先你要會標準化，以及虛擬變數轉換
+
+這邊遇到了一個小問題，各個資料的尺度不一致，有數值變數也有類別變數，各個數值的大小、變異和單位也不完全相同，為了讓各個變數對於距離計算的影響較一致，這邊選擇對所有變數做標準化：
+
+類別變數：轉換為1和0
+數值變數：轉換至「以最大最小值為1和0的尺度中」
+在這邊利用`mutate()`函數轉換數值變數，清楚且快速達到我們想要做的事
+
+#### 數值變數標準化
+```{r}
+GameTable 
+GameTable %>% mutate(
+  Aft = (Min_Aft - min(Min_Aft))/(max(Min_Aft)-min(Min_Aft)),
+  Eve = (Min_Eve - min(Min_Eve))/(max(Min_Eve)-min(Min_Eve)),
+  Mid = (Min_Mid - min(Min_Mid))/(max(Min_Mid)-min(Min_Mid)),
+  Coin = (Buy_Coin - min(Buy_Coin))/(max(Buy_Coin)-min(Buy_Coin)),
+  Dia = (Buy_Dia - min(Buy_Dia))/(max(Buy_Dia)-min(Buy_Dia)),
+  Car = (Buy_Car - min(Buy_Car))/(max(Buy_Car)-min(Buy_Car)),
+) -> GameTable
+
+GameTable %<>% select(1:7, 10:15, everything()) 
+```
+
+```{r}
+# kable(GameTable)
+```
+
+#### 類別變數轉換
+
+```{r}
+GameTable %>%
+  model.matrix( ~ Identity + Telecom, data = .) -> GameTableBinary
+
+GameTable ##intercept本質上就是有點累贅，因為若是二元變數，則非1即0，反之若為三元變數（就只需要1 0 或者 0 1，那若皆為0 0，則會是最一開始的benckmark，因此我們可以將intercept給去除。
+```
+
+```{r}
+GameTable %>% cbind(GameTableBinary[,2:4]) -> GameTable
+```
+
+## EDA
+
+```{r}
+GameTable %>% select(8:13, 16:18) -> GameTable2
+```
+
+先使用`cor()`觀察資料間的相關性，再用熱密度圖(`heatmap`)，進行視覺化；為了將資料呈現為「變數一、變數二、相關係數」這樣的整齊格式，在這邊要使用`melt()`函數進行資料轉換
+```{r}
+GameTable2 %>% cor() %>% melt() -> Cor.Matrix
+Cor.Matrix
+```
+
+```{r}
+Cor.Matrix %>% ggplot(data = ., aes(x=Var1, y=Var2)) + 
+  geom_tile(aes(fill=value)) + 
+  scale_fill_gradient2(low = "firebrick4",
+                       high = "steelblue",
+                       mid = "white",
+                       midpoint = 0) + 
+  guides(fill=guide_legend("Correlation Coefficient")) + 
+  theme(axis.title.x = element_text(hjust = 1, vjust = 1, angle = 45))
+```
+
