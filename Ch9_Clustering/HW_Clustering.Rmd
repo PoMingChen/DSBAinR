@@ -181,7 +181,7 @@ GameTableFinal.ClusterGraph %>%
 ```{r}
 GameTableFinal2 %>% ggplot(data = ., aes(x=Identity)) + 
   geom_bar() + 
-  facet_wrap(~Cluster) ## Cluster 1 2 3 -> 360 400 160人
+  facet_wrap(~Cluster) ## 觀察各群使用者的組成狀況，是老手多呢？還是新手多？
 ```
 
 ```{r}
