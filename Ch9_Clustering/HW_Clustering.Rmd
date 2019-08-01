@@ -1,0 +1,194 @@
+---
+title: "HW_Clustering"
+author: "PoMingChen"
+date: "8/1/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Env setting
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(knitr)
+library(reshape2)
+library(ggfortify)
+```
+
+```{r}
+Gamelog2 <- read_csv("./Game_Log.csv")
+UserTable2 <- read_csv("./User_Table.csv")
+```
+
+#### 注意事項
+
+1. 讀成data.frame
+`read.csv('檔案名稱', encoding = 'UTF-8')`
+2. 讀成tibble
+`read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
+為了避免程式中的隨機效果造成答案不一致，請將隨機種子設置為500：
+`set.seed(500)`
+
+## 題目一
+
+1. 合併出完整資料集：將兩筆資料以User_Id進行合併，並計算出各玩家在過去五天中各時段的平均遊玩時間及各項目的平均購買金額。
+
+```{r 合併資料集}
+Gamelog2 %>% group_by(User_Id) %>%
+  summarise(Min_Aft = mean(Min_Aft, na.rm = T),
+            Min_Eve = mean(Min_Eve, na.rm = T),
+            Min_Mid = mean(Min_Mid, na.rm = T),
+            Buy_Coin = mean(Buy_Coin, na.rm = T),
+            Buy_Dia = mean(Buy_Dia, na.rm = T),
+            Buy_Car = mean(Buy_Car, na.rm = T)
+            ) %>% inner_join(x=., y=UserTable2, by="User_Id") -> GameTable2
+```
+
+```{r 檢視合併後資料集}
+GameTable2
+```
+
+```{r 進行數值變數標準化}
+GameTable2 %<>% mutate(
+  Aft = (Min_Aft-min(Min_Aft))/(max(Min_Aft)-min(Min_Aft)),
+  Eve = (Min_Eve-min(Min_Eve))/(max(Min_Eve)-min(Min_Eve)),
+  Mid = (Min_Mid-min(Min_Mid))/(max(Min_Mid)-min(Min_Mid)),
+  Coin = (Buy_Coin-min(Buy_Coin))/(max(Buy_Coin)-min(Buy_Coin)),
+  Dia = (Buy_Dia-min(Buy_Dia))/(max(Buy_Dia)-min(Buy_Dia)),
+  Car = (Buy_Car-min(Buy_Car))/(max(Buy_Car)-min(Buy_Car)),
+)
+```
+
+```{r 進行類別變數虛擬變數處理}
+set.seed(500)
+GameTable2 %>% model.matrix(~Identity+Telecom, data = .) -> GameTableDummy2
+```
+
+```{r 完成標準化資料集}
+GameTable2 %<>% cbind(GameTableDummy2[,2:4])
+GameTable2 %>% select(10:18) -> GameTableResult2
+GameTableResult2 ##標準化資料集，準備進行分析
+```
+
+2. 集群分析：從資料中 __選取出各時段的平均遊玩時間及各項目的平均購買金額__後，以Kmeans演算法進行分群，並分成3群。
+
+> 這邊只有要針對數值變數類型的部分，作為分群的依據。沒有類別資料。
+
+```{r}
+set.seed(500)
+GameTableResult2
+GameTableResult2[1:6] %>% kmeans(x=., centers = 3) -> KCluster2
+```
+
+```{r 檢視Kmeans分群結果}
+KCluster2
+```
+
+
+3. 將 __下午的遊玩時間__和 __購買金幣金額__還原至完整資料集中的真實值(非標準化後的數字)，並計算第一群在這兩個特徵的中位數(Median)。
+
+```{r 將分群結果貼回原始資料集} 
+GameTable2 %>% cbind(., KCluster2$cluster) %>% 
+  rename(Cluster = 'KCluster2$cluster') -> GameTableFinal2
+GameTableFinal2 ##將分群結果貼回原始資料集
+```
+
+#### 疑問
+
+以下這兩個程式，跑出來的median為什麼會不一樣？
+```{r 老師的解答}
+GameTableFinal2
+GameTableFinal2 %>% filter(Cluster == 1) %>%
+  summarise(
+    Min_Aft_median = median(Aft*(max(Min_Aft)-min(Min_Aft)) + min(Min_Aft)),
+    Buy_Coin_median = median(Coin*(max(Buy_Coin)-min(Buy_Coin)) + min(Buy_Coin))
+    )
+```
+
+```{r 直接取median}
+GameTableFinal2 %>% filter(Cluster == 1) %>%
+  summarise(
+    Min_Aft_median = median(Min_Aft),
+    Buy_Coin_median = median(Buy_Coin)
+    )
+```
+
+```{r }
+# GameTableFinal2 %>% filter(Cluster == 1) -> GameTable2.Cluster1
+# GameTable2.Cluster1
+```
+
+
+```{r Min_Aft & Aft兩變數相關性檢視}
+library(psych)
+GameTable2.Cluster1 %>% 
+  select(Min_Aft,Aft) %>%
+  pairs.panels()
+```
+
+## 題目二
+
+> 這邊有一個很重要的基礎觀念容易被忽略：你在處理分群的`box_plot`的時候，是用標準化的圖去做，理由是一樣的，如果你拿沒有標準化的資料，玩的時間是分鐘，購買的單位是金額。那麼縱軸的比例尺會很不精準（金額動輒上百，但是分鐘大概上限是60），導致判斷失誤。
+
+1. 分群結果視覺化：利用`autoplot()`畫出分群在第一主成份和第二主成份為坐標圖中的結果。
+
+```{r}
+set.seed(500)
+autoplot(GameTableResult2[1:6] %>% kmeans(x=., centers = 3), data = GameTableResult2)
+```
+
+2. 分群特徵分布視覺化：利用boxplot描述各群體的特徵分布。
+
+```{r}
+GameTableFinal2 %>% select(1,8,9,10:15,19) %>% gather(
+  key = "Continuous_Variables",
+  value = "Normalized_values",
+  -c(User_Id, Cluster, Identity, Telecom)) -> GameTableFinal.ClusterGraph
+
+## To keep the Continuous_Variables in the order that we want
+GameTableFinal.ClusterGraph$Continuous_Variables <- GameTableFinal.ClusterGraph$Continuous_Variables %>% factor( levels = c('Aft','Eve','Mid','Coin','Dia','Car'))
+
+```
+
+```{r}
+GameTableFinal.ClusterGraph %>% 
+  ggplot(data = ., aes(x=Continuous_Variables, y=Normalized_values)) + 
+  geom_boxplot() + 
+  facet_wrap(~Cluster)
+```
+
+
+## 題目三
+
+試著提供僅針對此六個特徵進行分群的營運決策建議。
+
+由以下兩個資料視覺化可以發現
+
+1. 第一群玩家是 __新手玩家比較多__， __較多是在下午玩遊戲__，但是購買行為皆不明顯。
+
+建議：可以在下午時段推出相關鑽石或卡片等虛寶的「首購」優惠，先衝高他們的人均消費金額。
+
+2. 第二群玩家是 __一般玩家佔了絕大多數__， __較多是在晚上玩遊戲__，購買行為集中在金幣。
+
+建議：由於購買行為集中在金幣，且相差懸殊，可以推出綜合虛寶的Bundle，讓他們可以在既有想要買的金幣以外，多買一點，持續提高人均消費，也藉此觀察往後他們嘗試使用其他類型虛寶後，是否購買行為也有所改變（轉移）。
+
+3. 第三群玩家是 __老手玩家__，且 __較多在半夜玩遊戲__，由於購買行為相當普遍，遊戲黏著度與人均消費額已經不錯，建議推出邀請朋友獎勵。
+
+```{r}
+GameTableFinal2 %>% ggplot(data = ., aes(x=Identity)) + 
+  geom_bar() + 
+  facet_wrap(~Cluster) ## Cluster 1 2 3 -> 360 400 160人
+```
+
+```{r}
+GameTableFinal.ClusterGraph %>% 
+  ggplot(data = ., aes(x=Continuous_Variables, y=Normalized_values)) + 
+  geom_boxplot() + 
+  facet_wrap(~Cluster)
+```
+
+

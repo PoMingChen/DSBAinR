@@ -1,0 +1,95 @@
+---
+title: "try_test"
+author: "PoMingChen"
+date: "8/1/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+```{r}
+library(tidyverse)
+library(knitr)
+
+GameLog <- read.csv('Game_Log.csv')
+UserTable <- read.csv('User_Table.csv')
+
+
+GameTable <- GameLog %>%
+  group_by(User_Id) %>%
+  summarise(
+    Min_Aft = mean(Min_Aft),
+    Min_Eve = mean(Min_Eve),
+    Min_Mid = mean(Min_Mid),
+    Buy_Coin = mean(Buy_Coin),
+    Buy_Dia = mean(Buy_Dia),
+    Buy_Car = mean(Buy_Car)
+  ) %>%
+  inner_join(UserTable, by = 'User_Id')
+GameTable
+```
+
+```{r}
+GameTableNew <- GameTable[,2:7] %>%
+  mutate(
+    Aft = (Min_Aft - min(Min_Aft)) / (max(Min_Aft)-min(Min_Aft)),
+    Eve = (Min_Eve - min(Min_Eve)) / (max(Min_Eve)-min(Min_Eve)),
+    Mid = (Min_Mid - min(Min_Mid)) / (max(Min_Mid)-min(Min_Mid)),
+    Coin = (Buy_Coin - min(Buy_Coin)) / (max(Buy_Coin)-min(Buy_Coin)),
+    Dia = (Buy_Dia - min(Buy_Dia)) / (max(Buy_Dia)-min(Buy_Dia)),
+    Car = (Buy_Car - min(Buy_Car)) / (max(Buy_Car)-min(Buy_Car))
+  ) 
+GameTableNew
+```
+
+```{r}
+# Implement Kmeans Algorithm:
+set.seed(500) # remove the random effect
+K <- kmeans(GameTableNew[,7:12],3)
+
+ClusterResult <- cbind(
+  GameTableNew,
+  K$cluster
+) %>% as.data.frame()
+
+K
+
+colnames(ClusterResult)[ncol(ClusterResult)] <- 'Cluster'
+```
+
+```{r}
+ClusterResultMedian <- ClusterResult %>%
+  filter( Cluster == 1) %>%
+  summarise( Aft_Median = median(Aft * (max(Min_Aft) - min(Min_Aft)) + min(Min_Aft)),
+             Coin_Median = median(Coin * (max(Buy_Coin) - min(Buy_Coin)) + min(Buy_Coin)))
+
+kable(ClusterResultMedian)
+```
+
+```{r}
+library(ggfortify)
+set.seed(500)
+autoplot(kmeans(GameTableNew[,7:12], 3), data  = GameTableNew)
+```
+
+```{r}
+ClusterResultForPlot <- ClusterResult[,7:13] %>%
+  gather( key = Continuous_Variable,
+          value = Normalized_Value,
+          - Cluster)
+
+ClusterResultForPlot
+
+ClusterResultForPlot$Continuous_Variable <- ClusterResultForPlot$Continuous_Variable %>% factor( levels = c('Aft','Eve','Mid','Coin','Dia','Car'))
+
+ggplot( data = ClusterResultForPlot) + 
+  geom_boxplot( aes( x = Continuous_Variable,
+                     y = Normalized_Value),
+                size = 0.7) +
+  facet_wrap( ~ Cluster)
+```
+
