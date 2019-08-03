@@ -63,6 +63,11 @@ GameTable2 %<>% mutate(
 )
 ```
 
+```{r}
+GameTable2 %>% summary()
+```
+
+
 ```{r 進行類別變數虛擬變數處理}
 set.seed(500)
 GameTable2 %>% model.matrix(~Identity+Telecom, data = .) -> GameTableDummy2
@@ -101,7 +106,6 @@ GameTableFinal2 ##將分群結果貼回原始資料集
 
 以下這兩個程式，跑出來的median為什麼會不一樣？
 ```{r 老師的解答}
-GameTableFinal2
 GameTableFinal2 %>% filter(Cluster == 1) %>%
   summarise(
     Min_Aft_median = median(Aft*(max(Min_Aft)-min(Min_Aft)) + min(Min_Aft)),
@@ -117,9 +121,19 @@ GameTableFinal2 %>% filter(Cluster == 1) %>%
     )
 ```
 
+
 ```{r }
-# GameTableFinal2 %>% filter(Cluster == 1) -> GameTable2.Cluster1
-# GameTable2.Cluster1
+GameTableFinal2 %>% filter(Cluster == 1) -> GameTable2.Cluster1
+GameTable2.Cluster1
+GameTable2.Cluster1 %>% summary()
+```
+
+```{r}
+
+max(GameTable2.Cluster1$Buy_Coin)
+min(GameTable2.Cluster1$Buy_Coin)
+
+Buy_Coin_median = median(Coin*(max(Buy_Coin)-min(Buy_Coin)) + min(Buy_Coin))
 ```
 
 
@@ -130,16 +144,34 @@ GameTable2.Cluster1 %>%
   pairs.panels()
 ```
 
+```{r}
+GameTable2.Cluster1 %>% 
+  select(Buy_Coin, Coin) %>%
+  pairs.panels()
+```
+
+
 ## 題目二
 
 > 這邊有一個很重要的基礎觀念容易被忽略：你在處理分群的`box_plot`的時候，是用標準化的圖去做，理由是一樣的，如果你拿沒有標準化的資料，玩的時間是分鐘，購買的單位是金額。那麼縱軸的比例尺會很不精準（金額動輒上百，但是分鐘大概上限是60），導致判斷失誤。
 
 1. 分群結果視覺化：利用`autoplot()`畫出分群在第一主成份和第二主成份為坐標圖中的結果。
 
+> 基本上`ggfortify`算是`ggplot2`的強化包， __fortify__的意思就是強化的意思。那他可以快速用很少的程式碼將ggplot2繪圖物件給畫出來。那這邊是剛好他有支援k-means。
+
+加入`loadings`，本身就是可以看到背後的原始變數，也比較知道壓縮出PCA的感覺
 ```{r}
 set.seed(500)
-autoplot(GameTableResult2[1:6] %>% kmeans(x=., centers = 3), data = GameTableResult2)
+autoplot(GameTableResult2[1:6] %>% kmeans(x=., centers = 3), data = GameTableResult2, loadings=TRUE, loadings.label=TRUE, frame = T)
 ```
+
+
+若你將類別變數的 玩家分類(老手、新手)，使用電信（ABC other），也納進來，就會看到PCA變數背後本身，哪些變數間是比較相關的。
+```{r}
+# set.seed(500)
+# autoplot(GameTableResult2[1:9] %>% kmeans(x=., centers = 3), data = GameTableResult2, loadings=TRUE, loadings.label=TRUE)
+```
+
 
 2. 分群特徵分布視覺化：利用boxplot描述各群體的特徵分布。
 
@@ -153,6 +185,15 @@ GameTableFinal2 %>% select(1,8,9,10:15,19) %>% gather(
 GameTableFinal.ClusterGraph$Continuous_Variables <- GameTableFinal.ClusterGraph$Continuous_Variables %>% factor( levels = c('Aft','Eve','Mid','Coin','Dia','Car'))
 
 ```
+
+
+```{r}
+GameTableFinal.ClusterGraph$Continuous_Variables %>% class()
+GameTableFinal.ClusterGraph$Continuous_Variables %>% levels()
+## 如果有一組類別變數，要查看裡面存在著哪些類別，則用levels()
+## 如果要類別變數，則需要使用factor()，他其實與character很像，但是他有level的概念。
+```
+
 
 ```{r}
 GameTableFinal.ClusterGraph %>% 
@@ -191,4 +232,34 @@ GameTableFinal.ClusterGraph %>%
   facet_wrap(~Cluster)
 ```
 
+
+```{r}
+library("AER")
+library("ggplot2")
+library("dplyr")
+library("knitr")
+```
+
+```{r}
+data("Journals")
+```
+
+```{r}
+Journals %>% mutate(citeprice=price/citations) -> journals
+summary(journals)
+```
+
+```{r}
+library(psych)
+journals %>% 
+  select(citeprice,subs) %>%
+  pairs.panels()
+```
+
+```{r}
+journals %>% 
+  select(citeprice,subs) %>%
+  mutate_all(log) %>%
+  pairs.panels()
+```
 

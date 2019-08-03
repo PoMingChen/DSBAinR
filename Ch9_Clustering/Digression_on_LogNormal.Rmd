@@ -1,0 +1,67 @@
+---
+title: "Digression_on_LogNormal"
+author: "PoMingChen"
+date: "8/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 說明
+
+> 在寫這個章節的時候，因為`中位數`還原的問題，我有用到了`pairs.panels`這個函數。因此有重新想了一下資料分配本身對於後續scaling method以及瞭解本身分配的重要性問題。
+
+## 閱讀清單
+
+[https://medium.com/@ciortanmadalina/overview-of-data-distributions-87d95a5cbf0a](https://medium.com/@ciortanmadalina/overview-of-data-distributions-87d95a5cbf0a)
+
+- summary: 我覺得這篇文章真的滿讚的，基本上大概讓我回憶了一些東西。基本上所有的統計分配，就是分成間斷和連續型。再來細分你今天資料本身紀錄的內容是怎麼樣的：e.g. 在一定時間內，某件事情發生n次的機率為p（n = 1,2,3.....都可以），則是Poisson；反之，等待一件事情發生n次中間中間所需要的時間，則是exponential distribution。前者為間斷，後者為連續，但是彼此互為表裡。
+
+[Normalization vs Standardization — Quantitative analysis](https://towardsdatascience.com/normalization-vs-standardization-quantitative-analysis-a91e8a79cebf)
+
+- summary: 本質上，你用哪一個演算法（這篇文章是有關classifier，預測分類的問題），以及你用哪一個data preprocessing都會影響準確度，但是連z-score min-max這種被默認兩大主流方式，都不見得是最佳的，你必須看資料本身的分配特性，以及你要使用的演算法，是否會因為scaling而受益。畢竟有些演算法背後的數學與是否有scaling無關，像是random_forest.
+
+- 結論：瞭解資料本身的分配，與處理的問題核心是基本，進而會影響到你要怎麼對他做pre-processing的方法（stanardization or normalization...)，同時瞭解資料本身的特性，也 __有助於後續進行假設檢定__等。同時你要用的演算法，也會影想到scaling是否有其效益（這牽扯到演算法背後的數學）
+
+這邊要review一下Quantitative Method的log_Normal。
+
+## Quantitative Method log_Normal review
+
+```{r}
+library("AER")
+library("ggplot2")
+library("dplyr")
+library("knitr")
+```
+
+
+```{r}
+data("Journals")
+```
+
+```{r}
+Journals %>% mutate(citeprice=price/citations) -> journals
+summary(journals)
+```
+
+> 參考上面那個overview of data distribution文章
+
+Lognormal distribution is a good candidate for modelling _positively skewed values which are ≥0._ For instance, normal distribution cannot be used to model _stock prices_ because it has a negative side and stock prices cannot fall below zero so lognormal distribution is a good candidate.
+
+```{r}
+library(psych)
+journals %>% 
+  select(citeprice,subs) %>%
+  pairs.panels()
+## 你會看到citeprice sub滿符合由零起跳並且聚集一起的資料分配（positively skewed values which are ≥0）
+```
+
+```{r}
+journals %>% 
+  select(citeprice,subs) %>%
+  mutate_all(log) %>% ## 轉成log normal就可以做t test under sd.
+  pairs.panels()
+```
+
