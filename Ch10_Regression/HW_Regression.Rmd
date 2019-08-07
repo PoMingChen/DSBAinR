@@ -1,0 +1,139 @@
+---
+title: "HW_Regression"
+author: "PoMingChen"
+date: "8/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 注意事項
+
+請使用Restaurant_Sales_Renew.csv這組資料集合(可於上一單元下載)，依照以下題目及步驟完成此次作業：
+
+設置工作路徑，並確定兩個資料集合都放置在你的工作路徑：
+`setwd("你的完整工作路徑名稱")`
+檔案的編碼皆為UTF-8，讀取檔案時請注意：
+### 讀成data.frame
+`read.csv('檔案名稱', encoding = 'UTF-8')`
+### 讀成tibble
+`read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
+
+## Env setting
+
+```{r}
+library(tidyverse)
+library(magrittr)
+```
+
+```{r}
+read_csv("./Restaurant_Sales_Renew.csv", locale=locale(encoding="UTF-8")) -> SalesDataAll
+head(SalesDataAll)
+```
+
+## EDA
+
+```{r}
+SalesDataAll$Region %<>% as.factor()
+SalesDataAll$Type %<>% as.factor()
+SalesDataAll$Weekday %<>% as.factor()
+SalesDataAll$Month %<>% as.factor()
+```
+
+
+## 題目一
+
+1. 從完整資料集中，篩選出RegionB的資料進行建模。
+```{r}
+SalesDataAll %>% filter(Region %in% "B") -> SalesDataAll.B
+SalesDataAll.B
+```
+
+
+2. 僅選用Type、Weekday、Holiday、Store2_Event四種變數進行建模
+
+```{r}
+Model.B <- lm(Sales ~ Type + Weekday + Holiday + Store2_Event, data = SalesDataAll.B[,-c(1,2)])
+#data = SalesDataAll.B[,-c(1,2)] or data = SalesDataAll.B都ok，因為只要不要在迴歸公式內，下“,"，就只會引入必要的變數。
+```
+
+3. 須考慮Type和Weekday之間、Type和Holiday之間的兩種交互作用
+
+```{r}
+Model.B.interaction <- lm(Sales ~ Type + Weekday + Holiday + Store2_Event + Type*Weekday + Type*Holiday,
+                          data = SalesDataAll.B[,-c(1,2)])
+```
+
+4. 建立迴歸模型後，計算各個變數的Beta Coefficients以及Adjusted R-squared。
+
+各個coefficient都有達到***三顆星顯著（除了TypeBB:Holiday是0.055 < 0.1）顯著度較低。
+整體模型F-test也有達到顯著性（p-value: < 2.2e-16）。
+Adjusted R-squared ：0.6917 
+
+```{r}
+summary(Model.B.interaction)
+```
+
+
+## 題目二
+
+1. Beta Coefficients視覺化：畫出Beta Coefficients的長條圖(bar chart)。
+
+```{r}
+Coefficient <- tibble(
+  Name = names(Model.B.interaction$coefficients),
+  Value = Model.B.interaction$coefficients
+)
+
+Coefficient %<>% arrange(desc(Value))
+Coefficient$Name <- as.factor(Coefficient$Name)
+```
+
+```{r}
+Coefficient %>% ggplot(aes(x=factor(Name, levels = as.character(Coefficient$Name)), 
+                           y=Value)) + 
+  geom_bar(aes(fill=Name), stat = "identity") + 
+  coord_flip() +
+  labs(x="Variable", y="Sales", title = "the Beta Coefficient") +
+  theme_bw()
+```
+
+2. 計算模型預測值和真實值的MAPE。
+
+```{r}
+# Model.B.interaction$residuals
+
+# MAPE: Mean Absolute Percentage Error 
+
+MAPE.func <- function(predictions, actual){
+  mean(abs((predictions - actual)/actual)) %>% round(., digits = 3) -> decimal
+  paste0(x=decimal*100, 
+         y="%") -> MAPE
+  MAPE
+}
+
+```
+
+```{r}
+MAPE.func(Model.B.interaction$fitted.values, SalesDataAll.B$Sales)
+```
+
+
+```{r}
+cat("the MAPE of Model.B.Interaction is", MAPE.func(Model.B.interaction$fitted.values, SalesDataAll.B$Sales))
+```
+
+3. 根據模型和視覺化結果，提供決策建議。
+
+以結果來看，Intercept本身的解讀意思為（商業區範圍的百貨公司門市，在平日，且非假日或相關週年慶活動時間，平均預估單日業績為24474.964元。
+
+相關決策建議：
+
+1. 國定假日與週年慶活動提升營收效果，顯著高於一般週末，應把握機會進行店面活動與相關食材與人力資源管理效率。
+2. 獨立門市，與獨立門市在週末時間之交互效果，對於營收的負面影響最為顯著，因此推論週末上班族人潮離開而導致。
+
+
+
+

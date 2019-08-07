@@ -487,12 +487,13 @@ Beta <- cbind(
 
 colnames(Beta) <- c('Name', 'Value')
 
-Beta
+
 Beta$Value <- Beta$Value %>% as.character() %>% as.numeric() ##這是標準的，用來轉換成數值變數的過程。
 
 Beta <- Beta %>%
   arrange(desc(Value))
 
+Beta
 ggplot( data = Beta) + 
   geom_bar(aes( x = factor(Name, levels = as.character(Beta$Name)), 
              y = Value, 
