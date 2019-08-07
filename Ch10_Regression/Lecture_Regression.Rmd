@@ -147,6 +147,8 @@ DataA <- SalesData %>%
   filter( Region %in% 'A') ##A為觀光區
 DataB <- SalesData %>%
   filter( Region %in% 'B') ##B為商業區
+
+DataA
 ```
 
 #### 驗證假說一：門市類型的差異
@@ -231,13 +233,15 @@ Model.A$fitted.values #估計值
 # Model.A$effects
 ```
 
-以目前的迴歸模型，並沒有辦法預測到，比較極端的點。還有改善空間。若我們偷吃步用之後才會用到的`MAPE`，你會發現目前模型的可能的誤差高達25.5%
+以目前的迴歸模型，並沒有辦法預測到，比較極端的點。還有改善空間。若我們偷吃步用之後才會用到的`MAPE`，你會發現目前模型的可能的誤差高達10.6％
+
+如果是同樣是 A區域（觀光區）的店四，誤差狀況還好，約7.5%
 ```{r}
 #DataA[1:365,] ##for 店一
 #用兩個圖層，將估計值與原始資料（可以理解為training set）的預測狀況疊在一起做個比較。
 
 ggplot(data = DataA[1:365,]) + 
-  geom_point(aes(x = c(1:365), y = Sales)) + 
+  geom_point(aes(x = c(1:365), y = Sales), size = 0.2) + 
   geom_line(aes( x = c(1:365), #geom_line 主要是用來繪製時間趨勢圖（流量），那如果是geom_area，就是看底下陰影面積狀況（存量）
                  y = Model.A$fitted.values[1:365],
                  colour = 'red')) +
@@ -252,6 +256,202 @@ MAPE <- function( predict, actual){
   return(result)
 }
 
-cat('RegionA模型的MAPE：\n',MAPE(Model.A$fitted.values, DataA$Sales[1:365]),'%','\n',sep='')
+cat('RegionA店一，模型的MAPE：\n',MAPE(Model.A$fitted.values[1:365], DataA$Sales[1:365]),'%','\n',sep='')
 ```
+
+- 店四的營收
+
+```{r}
+ggplot(data = DataA[366:730,]) + 
+  geom_point(aes(x = c(1:365), y = Sales)) + 
+  geom_line(aes( x = c(1:365), #geom_line 主要是用來繪製時間趨勢圖（流量），那如果是geom_area，就是看底下陰影面積狀況（存量）
+                 y = Model.A$fitted.values[366:730],
+                 colour = 'red')) +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store4 Sales: Actual vs Predicted')
+```
+
+```{r}
+MAPE <- function( predict, actual){
+  result <- mean(abs((predict - actual)/actual)) %>% round(3) * 100
+  return(result)
+}
+
+cat('RegionA店四，模型的MAPE：\n',MAPE(Model.A$fitted.values[366:730], DataA$Sales[366:730]),'%','\n',sep='')
+```
+
+- 店二的營收
+
+由於店2考慮的因素較少，同樣也存在沒辦法掌握到較極端點的問題，（Model.B並沒有用weekday這個變數）
+
+Region B的兩家店（店三店四），就是誤差比較一致，大約接近10%
+
+```{r}
+ggplot( data = DataB[1:365,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.B$fitted.values[1:365],
+                  colour = 'red'))  +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store2 Sales: Actual vs Predicted')
+```
+
+```{r}
+cat('RegionB店二，模型的MAPE：\n',MAPE(Model.B$fitted.values[1:365], DataB$Sales[1:365]),'%','\n',sep='')
+```
+
+- 店三的營收
+
+```{r}
+ggplot(data = DataB[366:730,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.B$fitted.values[366:730],
+                  colour = 'red'))  +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store3 Sales: Actual vs Predicted')
+```
+
+```{r}
+cat('RegionB店三，模型的MAPE：\n',MAPE(Model.B$fitted.values[366:730], DataB$Sales[366:730]),'%','\n',sep='')
+```
+
+
+---
+
+## 加入新資訊，第二階段分析
+
+> 第一階段的分析，最終模型的預測能力並不是太好（但不算是全然的ML），那因此假設你是餐廳經理，進行修正後，發現百貨週年慶與國定假日也是很需要納入考量的內容，因為他們會影響人潮錢潮。因此把資料搜集過來並且重新分析一遍。
+
+```{r}
+SalesDataRenew <- read_csv('Restaurant_Sales_Renew.csv')
+
+head( SalesDataRenew[1:10,], row.names = T, caption = '新增資料')
+```
+
+
+### 驗證假說*2
+
+> Holiday & Events
+
+```{r}
+Model.Holiday <- lm( Sales ~ Holiday, data = SalesDataRenew)
+
+#如果是Store1_Event的值屬於1，或者Store2_Event的值屬於1，那麼就輸出為1，否則為0
+Event <- ifelse( SalesDataRenew$Store1_Event %in% 1 | SalesDataRenew$Store2_Event %in% 1, 1, 0)
+
+Event
+Model.Event <- lm( SalesDataRenew$Sales ~ Event)
+```
+
+F-test T-test都有過，那r^2小是正常的，表示他並不是一個主要可以解釋資料變異的變數，但是加入他，邊際上有增加一些模型解釋能力。
+```{r}
+summary(Model.Holiday)
+```
+
+```{r}
+summary(Model.Event)
+```
+
+
+
+### 將全部資料進行建模
+
+> 這邊我們先跳出之前的假設，嘗試將區域的差異納入模型中，試著討論模型能否學習到區域間的差異，進而產生更好的解釋能力。意思就是我不再用`DataA` `DataB`，先不分區域，直接用`SalesDataRenew`去跑。看看結果如何。
+
+原本的模型R^2: 0.7997 | 0.7978
+
+Holiday, Multiple R-squared:  0.004669,	Adjusted R-squared:  0.003987 
+Event, Multiple R-squared:  0.04023,	Adjusted R-squared:  0.03957 
+
+後來的模型R^2: 0.8221 | 0.82 
+
+確實加入新變數後，模型解釋力有提高，這是我們想看到的（但是，並不是把兩個新變數的R^2加進去）
+```{r}
+SalesData
+Model.All.OldVersion <- lm(Sales ~., data = SalesData[,-1])
+summary(Model.All.OldVersion)
+```
+
+```{r}
+SalesDataRenew
+Model.All <- lm( Sales ~ ., data = SalesDataRenew[,-1]) ## ~. 就是除了Sales以外，資料集本身其他的變數都給他放下去。
+summary(Model.All)
+```
+
+### 用視覺化圖表來檢視目前的成果
+
+- 店一的營收
+
+```{r}
+ggplot( data = SalesDataRenew[1:365,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.All$fitted.values[1:365],
+                  colour = 'red')) +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store1 Sales: Actual vs Predicted')
+```
+
+```{r}
+cat('RegionA店一，模型的MAPE：\n',MAPE(Model.All$fitted.values[1:365], SalesDataRenew$Sales[1:365]),'%','\n',sep='')
+```
+
+- 店二的營收
+
+```{r}
+ggplot( data = SalesDataRenew[366:730,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.All$fitted.values[366:730],
+                  colour = 'red')) +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store2 Sales: Actual vs Predicted')
+```
+
+```{r}
+cat('RegionA店二，模型的MAPE：\n',MAPE(Model.All$fitted.values[366:730], SalesDataRenew$Sales[366:730]),'%','\n',sep='')
+```
+
+- 店三的營收
+
+```{r}
+ggplot( data = SalesDataRenew[731:1095,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.All$fitted.values[731:1095],
+                  colour = 'red')) +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store3 Sales: Actual vs Predicted')
+```
+
+```{r}
+# MAPE()
+cat('RegionA店三，模型的MAPE：\n',MAPE(Model.All$fitted.values[731:1095], SalesDataRenew$Sales[731:1095]),'%','\n',sep='')
+```
+
+- 店四的營收
+
+```{r}
+ggplot( data = SalesDataRenew[1096:1460,]) + 
+  geom_point( aes(x = c(1:365), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:365),
+                  y = Model.All$fitted.values[1096:1460],
+                  colour = 'red')) +
+  labs( x = 'Day1 to Day365',
+        y = 'Sales',
+        title = 'Store4 Sales: Actual vs Predicted')
+```
+
+```{r}
+cat('RegionA店三，模型的MAPE：\n',MAPE(Model.All$fitted.values[1096:1460], SalesDataRenew$Sales[1096:1460]),'%','\n',sep='')
+```
+
+
 
