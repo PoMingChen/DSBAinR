@@ -32,9 +32,9 @@ head( SalesData[1:10,], row.names = F, caption = '原始資料')
 
 > 以下的EDA都只是以各個變數（Region Type Weekday Month）不斷去做視覺化觀察，觀察其箱型圖分配。
 
-### 各店的銷售分配
+#### 各店的銷售分配
 
-我們可以看到，店一店四，是營收中位數比較高的兩間店。()
+我們可以看到，店一店四，是營收中位數比較高的兩間店。
 
 - 店一：A為觀光區｜AA為百貨門市
 - 店二：B為商業區｜AA為百貨門市
@@ -44,9 +44,6 @@ head( SalesData[1:10,], row.names = F, caption = '原始資料')
 ```{r}
 # SalesData %>% class()
 SalesData$Store_Name <- as.factor(SalesData$Store_Name)
-
-SalesData %>%
-  filter(Store_Name %in% 4)
 
 ggplot(data = SalesData) + geom_boxplot(aes( x= Store_Name, y= Sales, colour = Store_Name)) + 
   labs( x = 'Store',
@@ -96,7 +93,7 @@ ggplot(data = SalesData) + geom_boxplot(aes( x = Type, y = Sales, colour = Type)
 
 ```{r}
 ggplot(data = SalesData) + geom_boxplot(aes( x = Weekday, y = Sales, colour = Weekday)) + 
-  facet_grid(. ~ Store_Name) + ##  這邊～ 前後有沒有“.” 不影響。然後facet_wrap，會把subplot用成長方形排版，但是我覺得比不上col. 分割做比較。
+  facet_grid(. ~ Store_Name) + ##  這邊～ 前後有沒有“.” 不影響。然後facet_wrap，會把subplot用成長方形排版，但是我覺得比不上col. 分割做比較。所以用facet_grid
   labs( x = 'Weekday',
         y = 'Sales',
         title = 'Sales Distribution by Weekday') 
@@ -118,7 +115,11 @@ SalesDatabyMonth
 
 #補充：geom_path: Each group consists of only one observation. Do you need to adjust the group aesthetic?
 #參考資料：x 軸( period ) 是一個`因子`而不是數值，因此它不會連接它們。 你可以通過在美學（aes, geomLine，確實有group這個aes)中，設置 group = 1 來修復這個問題，這告訴ggplot2將它們組合成一行。
-ggplot(data = SalesDatabyMonth, aes(x = Month, y = SalesMean, group = 1)) + geom_point() + geom_line() +
+ggplot(data = SalesDatabyMonth, aes(x = Month, 
+                                    y = SalesMean, 
+                                    group = 1)) + 
+  geom_point() + 
+  geom_line() +
   facet_grid(.~Store_Name) + ## 變數擺在~左邊，是for row. 反之右邊是for col.
   labs( x = 'Month',
         y = 'Sales',
@@ -135,7 +136,7 @@ __這個類型的物件裡面包含很多內容，用來描述模型的細節。
 
 ### 驗證假說*4
 
-> 剛才我們看了四個變數的資料視覺化，Region Type算是比較有顯著區別的變數，Type裡面是店三趨勢比較不同。因此接下來要用迴歸模型來驗證假說。
+> 剛才我們看了四個變數（Region Type Weekday Month）的資料視覺化，Region Type算是比較有顯著區別的變數，Type裡面是店三趨勢比較不同。因此接下來要用迴歸模型來驗證假說。
 
 
 ### 依區域分開建模
@@ -147,8 +148,6 @@ DataA <- SalesData %>%
   filter( Region %in% 'A') ##A為觀光區
 DataB <- SalesData %>%
   filter( Region %in% 'B') ##B為商業區
-
-DataA
 ```
 
 #### 驗證假說一：門市類型的差異
@@ -174,7 +173,7 @@ Model.B.Week <- lm( Sales ~ Weekday, data = DataB)
 ```
 
 平日假日對於區域A而言雖有顯著的差異(`t-test` ***)，但對整體營收變化的解釋力較弱(`r^2`比較小)
-；對於區域B而言，並沒有顯著的差異及影響。
+；對於區域B而言，並沒有顯著的差異及影響。（包含整體模型與個別係數）
 ```{r}
 summary(Model.A.Week)
 ```
@@ -191,7 +190,7 @@ Model.A.Month <- lm( Sales ~ Month, data = DataA)
 Model.B.Month <- lm( Sales ~ Month, data = DataB)
 ```
 
-區域A間的區域B間的月份間(t-test)皆有顯著的差異，但各月份的影響程度不一；對於區域B而言，月份對整體營收的變化有較好的解釋能力。(F-test有過，Model.A.Month的p-value：0.07117，頂多過10%的假設檢定)
+區域A間的區域B間的月份間(t-test)皆有顯著的差異，但各月份的影響程度不一；對於區域B而言，月份對整體營收的變化有較好的解釋能力。(F-test有過，Model.A.Month的p-value：0.07117，頂多有過10%的假設檢定)
 ```{r}
 summary(Model.A.Month)
 ```
@@ -217,11 +216,11 @@ Model.B <- lm( Sales ~ Type + Month, data = DataB)
 
 完成第一階段的模型建立
 ```{r}
-summary(Model.A) ##解釋力0.8432
+summary(Model.A) ##解釋力0.8432 ｜ 0.8403
 ```
 
 ```{r}
-summary(Model.B) ##解釋力0.5438
+summary(Model.B) ##解釋力0.5438|0.5362
 ```
 
 ### 用視覺化圖表來檢視目前的成果
@@ -236,7 +235,7 @@ Model.A$fitted.values #估計值
 
 以目前的迴歸模型，並沒有辦法預測到，比較極端的點。還有改善空間。若我們偷吃步用之後才會用到的`MAPE`，你會發現目前模型的可能的誤差高達10.6％
 
-如果是同樣是 A區域（觀光區）的店四，誤差狀況還好，約7.5%
+如果是同樣是 A區域（觀光區）的店四，誤差狀況還好，約6.6%
 ```{r}
 #DataA[1:365,] ##for 店一
 #用兩個圖層，將估計值與原始資料（可以理解為training set）的預測狀況疊在一起做個比較。
@@ -286,7 +285,7 @@ cat('RegionA店四，模型的MAPE：\n',MAPE(Model.A$fitted.values[366:730], Da
 
 由於店2考慮的因素較少，同樣也存在沒辦法掌握到較極端點的問題，（Model.B並沒有用weekday這個變數）
 
-Region B的兩家店（店三店四），就是誤差比較一致，大約接近10%
+Region B的兩家店（店二店三），就是誤差比較一致，大約接近10%
 
 ```{r}
 ggplot( data = DataB[1:365,]) + 
@@ -325,7 +324,7 @@ cat('RegionB店三，模型的MAPE：\n',MAPE(Model.B$fitted.values[366:730], Da
 
 ## 加入新資訊，第二階段分析
 
-> 第一階段的分析，最終模型的預測能力並不是太好（但不算是全然的ML），那因此假設你是餐廳經理，進行修正後，發現百貨週年慶與國定假日也是很需要納入考量的內容，因為他們會影響人潮錢潮。因此把資料搜集過來並且重新分析一遍。
+> 第一階段的分析，最終模型的預測能力並不是太好（但不算是全然的ML，算是一個refining process of regression model），那因此假設你是餐廳經理，進行修正後，發現百貨週年慶與國定假日也是很需要納入考量的內容，因為他們會影響人潮錢潮。因此把資料搜集過來並且重新分析一遍。
 
 ```{r}
 SalesDataRenew <- read_csv('Restaurant_Sales_Renew.csv')
@@ -344,12 +343,14 @@ Model.Holiday <- lm( Sales ~ Holiday, data = SalesDataRenew)
 #如果是Store1_Event的值屬於1，或者Store2_Event的值屬於1，那麼就輸出為1，否則為0
 Event <- ifelse( SalesDataRenew$Store1_Event %in% 1 | SalesDataRenew$Store2_Event %in% 1, 1, 0)
 
-Event
 Model.Event <- lm( SalesDataRenew$Sales ~ Event)
+```
+
+```{r}
 Model.Event$coefficients
 ```
 
-F-test T-test都有過，那r^2小是正常的，表示他並不是一個主要可以解釋資料變異的變數，但是加入他，邊際上有增加一些模型解釋能力。
+兩個新加入變數，F-test T-test都有過，那r^2小是正常的，表示他並不是一個主要可以解釋資料變異的變數，但是加入他，邊際上有增加一些模型解釋能力。
 ```{r}
 summary(Model.Holiday)
 ```
@@ -360,7 +361,7 @@ summary(Model.Event)
 
 
 
-### 將全部資料進行建模
+## 將全部資料進行建模
 
 > 這邊我們先跳出之前的假設，嘗試將區域的差異納入模型中，試著討論模型能否學習到區域間的差異，進而產生更好的解釋能力。意思就是我不再用`DataA` `DataB`，先不分區域，直接用`SalesDataRenew`去跑。看看結果如何。
 
@@ -487,7 +488,7 @@ Beta <- cbind(
 colnames(Beta) <- c('Name', 'Value')
 
 Beta
-Beta$Value <- Beta$Value %>% as.character() %>% as.numeric() ##這是標準用來轉換成數值變數的過程。
+Beta$Value <- Beta$Value %>% as.character() %>% as.numeric() ##這是標準的，用來轉換成數值變數的過程。
 
 Beta <- Beta %>%
   arrange(desc(Value))
@@ -507,7 +508,7 @@ ggplot( data = Beta) +
 
 這邊納入了一個新觀念：`交互作用(interaction)`，在前面的建模過程中，我們觀察到不同門市類型的平假日表現可能有所不同，因此我們用`Var1 * Var2`這樣的方式表示兩個變數間互相的影響，會對目標變數造成什麼樣的效果。
 
-> 在前面，#### 各店間的平假日銷售分配，促發了這邊的討論。
+> 在前面，#### 各店間的平假日銷售分配，促發了這邊的討論。同時分Region有其必要性
 > Type部分 1 2是一組，為百貨店。 3 4是一組，為獨立店。
 
 ```{r}
@@ -537,7 +538,7 @@ Multiple R-squared:  0.7738,	Adjusted R-squared:  0.7687
 你會發現，有做區域區分，起手式就對了一半。
 
 ```{r}
-summary(Model.A.All )
+summary(Model.A.All)
 ```
 
 ```{r}
@@ -648,7 +649,7 @@ cat('RegionA 第四間店 模型的MAPE：\n',MAPE(Model.A.All$fitted.values[366
 
 ## 連鎖餐飲區域經理的決策
 
-> 這邊一樣是區域A B分開討論，看其估計係數，延續最終refine Model
+> 這邊一樣是區域A B分開討論，看其估計係數，延續最終refined Model
 
 ### 營收分析：Region A(觀光區)
 
@@ -673,7 +674,9 @@ Beta.Region.A$Value <- Beta.Region.A$Value %>% as.character() %>% as.numeric() #
 
 Beta.Region.A <- Beta.Region.A %>%
   arrange(desc(Value))
+```
 
+```{r}
 ggplot( data = Beta.Region.A) + 
   geom_bar(aes( x = factor(Name, levels = as.character(Beta.Region.A$Name)), 
              y = Value, 
@@ -708,6 +711,10 @@ Beta.Region.B$Value <- Beta.Region.B$Value %>% as.character() %>% as.numeric() #
 Beta.Region.B <- Beta.Region.B %>%
   arrange(desc(Value))
 
+```
+
+
+```{r}
 ggplot( data = Beta.Region.B) + 
   geom_bar(aes( x = factor(Name, levels = as.character(Beta.Region.B$Name)), 
              y = Value, 
@@ -727,8 +734,10 @@ January <- tibble( 'Day' = c(1:31),
                    'Sales_Upperbound' = Model.A.All$fitted.values[1:31] * 1.097,
                    'Sales_Lowerbound' = Model.A.All$fitted.values[1:31] * 0.903,
                    'Sales_Prediction' = Model.A.All$fitted.values[1:31]) 
-#the percentage error is about 9.7% in Store1
+#the percentage error is about 9.7% in Store1 in the refined model.
+```
 
+```{r}
 #geom_segment draws a straight line between points (x, y) and (xend, yend). geom_curve draws a curved line.
 ggplot(data = January)  +
   geom_segment(aes(x=Day, 
