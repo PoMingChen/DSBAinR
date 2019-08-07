@@ -9,22 +9,152 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## EDA
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+library(tidyverse)
+library(knitr)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+SalesData <- read_csv('./Restaurant_Sales.csv')
 
-```{r cars}
-summary(cars)
+head( SalesData[1:10,], row.names = F, caption = '原始資料')
 ```
 
-## Including Plots
+基本變數資料：
 
-You can also embed plots, for example:
+- Store_Name： 店別
+- Region：所在區域，A為觀光區，B為商業區
+- Type： 門市類型，AA為百貨門市，BB為獨立門市
+- Day_Type：日別
+- Month：月份
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+然後每間店都是過去一年的營收資料，共有365*4=1460 rows.
+
+> 以下的EDA都只是以各個變數（Region Type Weekday Month）不斷去做視覺化觀察，觀察其箱型圖分配。
+
+### 各店的銷售分配
+
+我們可以看到，店一店四，是營收中位數比較高的兩間店。()
+
+- 店一：A為觀光區｜AA為百貨門市
+- 店二：B為商業區｜AA為百貨門市
+- 店三：B為商業區｜BB為獨立門市
+- 店四：A為觀光區｜BB為獨立門市
+
+```{r}
+# SalesData %>% class()
+SalesData$Store_Name <- as.factor(SalesData$Store_Name)
+
+SalesData %>%
+  filter(Store_Name %in% 4)
+
+ggplot(data = SalesData) + geom_boxplot(aes( x= Store_Name, y= Sales, colour = Store_Name)) + 
+  labs( x = 'Store',
+        y = 'Sales',
+        title = 'Sales Distribution by Store')
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+#### 各區域的銷售分配
+
+以區域Region來分，那麼1 4會一組。2 3會一組。
+
+- 店一：A為觀光區｜AA為百貨門市
+- 店二：B為商業區｜AA為百貨門市
+- 店三：B為商業區｜BB為獨立門市
+- 店四：A為觀光區｜BB為獨立門市
+
+很明顯的， __A觀光區__的營收中位數比較高。
+
+```{r}
+ggplot(data = SalesData) + geom_boxplot(aes( x = Region, y = Sales,colour = Region)) + 
+  labs( x = 'Region',
+        y = 'Sales',
+        title = 'Sales Distribution by Region')
+```
+
+#### 各門市類型的銷售分配
+
+以門市類型Type來分，那麼 1 2會一組，3 4會一組。
+
+很明顯的， __AA為百貨門市__的營收中位數比較高。
+
+```{r}
+ggplot(data = SalesData) + geom_boxplot(aes( x = Type, y = Sales, colour = Type)) + 
+  labs( x = 'Type',
+        y = 'Sales',
+        title = 'Sales Distribution by Type')
+```
+
+#### 各店間的平假日銷售分配
+
+四間店平日和假日的銷售分佈不盡相同，店三的狀況比較特別。
+
+- 店一：A為觀光區｜AA為百貨門市｜假日比平日高
+- 店二：B為商業區｜AA為百貨門市｜假日比平日高
+- 店三：B為商業區｜BB為獨立門市｜假日比平日低
+- 店四：A為觀光區｜BB為獨立門市｜假日比平日高
+
+```{r}
+ggplot(data = SalesData) + geom_boxplot(aes( x = Weekday, y = Sales, colour = Weekday)) + 
+  facet_grid(. ~ Store_Name) + ##  這邊～ 前後有沒有“.” 不影響。然後facet_wrap，會把subplot用成長方形排版，但是我覺得比不上col. 分割做比較。
+  labs( x = 'Weekday',
+        y = 'Sales',
+        title = 'Sales Distribution by Weekday') 
+```
+
+#### 各店間的月份銷售分配
+
+四間店在各月份的銷售分佈也不盡相同
+
+```{r}
+SalesData$Month <- factor(SalesData$Month, levels = c('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'))
+
+SalesDatabyMonth <- SalesData %>% 
+  group_by(Store_Name, Month) %>%
+  summarise(SalesMean = mean(Sales))
+
+SalesDatabyMonth
+
+
+#補充：geom_path: Each group consists of only one observation. Do you need to adjust the group aesthetic?
+#參考資料：x 軸( period ) 是一個`因子`而不是數值，因此它不會連接它們。 你可以通過在美學（aes, geomLine，確實有group這個aes)中，設置 group = 1 來修復這個問題，這告訴ggplot2將它們組合成一行。
+ggplot(data = SalesDatabyMonth, aes(x = Month, y = SalesMean, group = 1)) + geom_point() + geom_line() +
+  facet_grid(.~Store_Name) + ## 變數擺在~左邊，是for row. 反之右邊是for col.
+  labs( x = 'Month',
+        y = 'Sales',
+        title = 'Sales Distribution by Month') 
+```
+
+## Regression
+
+迴歸分析主要會用到的函數是`lm()`，意思是Linear Model。主要使用到的參數有兩個：
+
+`formula: Y ~ X1 + X2`，Y是反應變數，X1和X2是解釋變數。
+data: 要分析的資料集合名稱。
+__這個類型的物件裡面包含很多內容，用來描述模型的細節。如果要呼叫摘要__，一樣使用`summary()`。
+
+### 驗證假說*4
+
+> 剛才我們看了四個變數的資料視覺化，Region Type算是比較有顯著區別的變數，Type裡面是店三趨勢比較不同。因此接下來要用迴歸模型來驗證假說。
+
+
+### 依區域分開建模
+
+由於我們發現區域(Region)之間的營業額有較明顯的差異，但在其他變數中營業額的分布各有不同，因此我們先依照區域切分資料，探討其他變數的影響。或者你可以想成最基本的立足點相同。
+
+```{r}
+DataA <- SalesData %>%
+  filter( Region %in% 'A') ##A為觀光區
+DataB <- SalesData %>%
+  filter( Region %in% 'B') ##B為商業區
+```
+
+```{r}
+Model.A.Type <- lm( Sales ~ Type, data = DataA)
+Model.B.Type <- lm( Sales ~ Type, data = DataB)
+```
+
+```{r}
+summary(Model.A.Type)
+```
+
