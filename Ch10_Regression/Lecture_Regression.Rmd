@@ -615,7 +615,7 @@ Now,
 9.1% -> 7.9%
 6.6% -> 5.9%
 
-很讚！這就是精心設計迴歸模型的過程！
+很讚！這就是精心設計迴歸模型（the process of a refined model）的過程！
 
 
 - 店一 （Region A）
@@ -647,4 +647,116 @@ cat('RegionA 第四間店 模型的MAPE：\n',MAPE(Model.A.All$fitted.values[366
 ```
 
 ## 連鎖餐飲區域經理的決策
+
+> 這邊一樣是區域A B分開討論，看其估計係數，延續最終refine Model
+
+### 營收分析：Region A(觀光區)
+
+從beta coefficient的數值中，我們可以得知，在區域A中：
+
+1. 百貨門市(AA)的表現較一般門市(BB)來得優異
+2. 在各月份中，7月、12月和1月是表現較好的月份，也許和暑假、聖誕、跨年和過年等有關，對營收的影響和國定假日差不多
+3. Store1的百貨特別活動對營收有正面影響，但僅和週末的影響差不多
+值得注意的是，一般門市 __在假日時營收會略為下滑__，推論為假日時人潮集中至百貨門市
+
+```{r}
+Beta.Region.A <- cbind(
+  names(Model.A.All$coefficients),
+  Model.A.All$coefficients
+) %>% 
+  as.data.frame() 
+
+colnames(Beta.Region.A) <- c('Name', 'Value')
+
+Beta.Region.A
+Beta.Region.A$Value <- Beta.Region.A$Value %>% as.character() %>% as.numeric() ##這是標準用來轉換成數值變數的過程。
+
+Beta.Region.A <- Beta.Region.A %>%
+  arrange(desc(Value))
+
+ggplot( data = Beta.Region.A) + 
+  geom_bar(aes( x = factor(Name, levels = as.character(Beta.Region.A$Name)), 
+             y = Value, 
+             fill = Name),stat = 'identity') + 
+    labs( x = 'Variable',
+          y = 'Beta Coefficient',
+          title = 'Beta Coefficient of Model.A.All') + coord_flip() + theme_bw()
+```
+
+
+### 營收分析：Region B（商業區）
+
+從beta coefficient的數值中，我們可以得知，在區域B中：
+
+1. 百貨門市(AA)的表現較一般門市(BB)來得優異
+2. 在各月份中，7月月和1月是明顯的旺季，對營收的影響甚至超過國定假日
+3. Store2的百貨促銷活動對營收有正面的影響，建議可以加強此時段的促銷配合
+值得注意的是，一般門市在假日時營收會 __明顯下滑__，推論為商業區的一般門市在假日時有較少的來客，應針對此點進行改善
+
+```{r}
+Beta.Region.B <- cbind(
+  names(Model.B.All$coefficients),
+  Model.B.All$coefficients
+) %>% 
+  as.data.frame() 
+
+colnames(Beta.Region.B) <- c('Name', 'Value')
+
+Beta.Region.B
+Beta.Region.B$Value <- Beta.Region.B$Value %>% as.character() %>% as.numeric() ##這是標準用來轉換成數值變數的過程。
+
+Beta.Region.B <- Beta.Region.B %>%
+  arrange(desc(Value))
+
+ggplot( data = Beta.Region.B) + 
+  geom_bar(aes( x = factor(Name, levels = as.character(Beta.Region.B$Name)), 
+             y = Value, 
+             fill = Name),stat = 'identity') + 
+    labs( x = 'Variable',
+          y = 'Beta Coefficient',
+          title = 'Beta Coefficient of Model.B.All') + coord_flip() + theme_bw()
+```
+
+### 營業目標及展店的營收估計
+
+在下一個年度的訂定每日或每週的營業目標時，能參考模型的預測，並將預測的誤差當作容許的範圍，以店1的一月份為例：
+
+用`geom_segment`作圖。
+```{r}
+January <- tibble( 'Day' = c(1:31),
+                   'Sales_Upperbound' = Model.A.All$fitted.values[1:31] * 1.097,
+                   'Sales_Lowerbound' = Model.A.All$fitted.values[1:31] * 0.903,
+                   'Sales_Prediction' = Model.A.All$fitted.values[1:31]) 
+#the percentage error is about 9.7% in Store1
+
+#geom_segment draws a straight line between points (x, y) and (xend, yend). geom_curve draws a curved line.
+ggplot(data = January)  +
+  geom_segment(aes(x=Day, 
+                   xend=Day, 
+                   y=Sales_Upperbound, 
+                   yend=Sales_Lowerbound)) +
+  geom_point(aes(x = Day,
+                 y = Sales_Upperbound,
+                 colour = "Upper")) +
+  geom_point(aes(x = Day, 
+                 y = Sales_Lowerbound,
+                 colour = 'Lower')) + 
+  
+  geom_line(aes(x=Day,
+                y=Sales_Prediction),
+                colour = "orange")
+  labs( x = 'Day in January',
+        y = 'Prediction Interval',
+        title = 'Predicted Sales in January')
+```
+
+用`geom_errorbar()`作圖。
+```{r}
+January %>% ggplot(aes(x=Day)) +
+  geom_errorbar(aes(
+    y = Sales_Prediction, ##Ignoring unknown aesthetics: y, and only to be recognized in geom_pointrange
+    ymin = Sales_Lowerbound,
+    ymax = Sales_Upperbound
+  ))
+```
 
