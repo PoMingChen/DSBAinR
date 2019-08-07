@@ -158,6 +158,7 @@ Model.B.Type <- lm( Sales ~ Type, data = DataB)
 ```
 
 對於這兩個區域而言， __門市類型的差異有非常顯著的影響（係數顯著程度***，且區域A係數為-22486，區域B係數為-5836），R-squared分別是0.72和0.46，具有相當不錯的解釋能力。__
+
 ```{r}
 summary(Model.A.Type)
 ```
@@ -345,6 +346,7 @@ Event <- ifelse( SalesDataRenew$Store1_Event %in% 1 | SalesDataRenew$Store2_Even
 
 Event
 Model.Event <- lm( SalesDataRenew$Sales ~ Event)
+Model.Event$coefficients
 ```
 
 F-test T-test都有過，那r^2小是正常的，表示他並不是一個主要可以解釋資料變異的變數，但是加入他，邊際上有增加一些模型解釋能力。
@@ -384,6 +386,11 @@ summary(Model.All)
 
 ### 用視覺化圖表來檢視目前的成果
 
+> 我們發現，雖然可以捕抓到營收比較高的點了，但是若是用整體模型來預測的話，反而有高估或低估的狀況，而且若是用MAPE的角度來的話，誤差百分比數據也都是上升的。
+
+因此，區域和門市類型的差異，頗大的，會高度影響了模型的解釋與判斷，因此將四間店的資料納入同一個模型並非最好的做法。
+
+
 - 店一的營收
 
 ```{r}
@@ -398,7 +405,7 @@ ggplot( data = SalesDataRenew[1:365,]) +
 ```
 
 ```{r}
-cat('RegionA店一，模型的MAPE：\n',MAPE(Model.All$fitted.values[1:365], SalesDataRenew$Sales[1:365]),'%','\n',sep='')
+cat('RegionA店一，模型的MAPE：\n',MAPE(Model.All$fitted.values[1:365], SalesDataRenew$Sales[1:365]),'%','\n',sep='') ##10.5% -> 11.4%
 ```
 
 - 店二的營收
@@ -415,7 +422,7 @@ ggplot( data = SalesDataRenew[366:730,]) +
 ```
 
 ```{r}
-cat('RegionA店二，模型的MAPE：\n',MAPE(Model.All$fitted.values[366:730], SalesDataRenew$Sales[366:730]),'%','\n',sep='')
+cat('RegionA店二，模型的MAPE：\n',MAPE(Model.All$fitted.values[366:730], SalesDataRenew$Sales[366:730]),'%','\n',sep='') # 9.8 -> 17.3%，有高估傾向
 ```
 
 - 店三的營收
@@ -433,7 +440,7 @@ ggplot( data = SalesDataRenew[731:1095,]) +
 
 ```{r}
 # MAPE()
-cat('RegionA店三，模型的MAPE：\n',MAPE(Model.All$fitted.values[731:1095], SalesDataRenew$Sales[731:1095]),'%','\n',sep='')
+cat('RegionA店三，模型的MAPE：\n',MAPE(Model.All$fitted.values[731:1095], SalesDataRenew$Sales[731:1095]),'%','\n',sep='') #9.1 -> 23%
 ```
 
 - 店四的營收
@@ -446,12 +453,198 @@ ggplot( data = SalesDataRenew[1096:1460,]) +
                   colour = 'red')) +
   labs( x = 'Day1 to Day365',
         y = 'Sales',
-        title = 'Store4 Sales: Actual vs Predicted')
+        title = 'Store4 Sales: Actual vs Predicted') #6.6 -> 14.7%
 ```
 
 ```{r}
 cat('RegionA店三，模型的MAPE：\n',MAPE(Model.All$fitted.values[1096:1460], SalesDataRenew$Sales[1096:1460]),'%','\n',sep='')
 ```
 
+- 四間店綜合比較
 
+區域和門市類型的差異影響了模型的解釋與判斷，因此將四間店的資料納入同一個模型並非最好的做法。
+
+```{r}
+ggplot( data = SalesDataRenew) + 
+  geom_point( aes(x = c(1:1460),y = Sales), size=0.2) + 
+  geom_line( aes( x = c(1:1460),
+                  y = Model.All$fitted.values,
+                  colour = 'red')) +
+  labs( x = 'Day',
+        y = 'Sales',
+        title = 'Store Sales: Actual vs Predicted')
+```
+
+#### Beta Coefficients
+
+```{r}
+Beta <- cbind(
+  names(Model.All$coefficients),
+  Model.All$coefficients
+) %>% 
+  as.data.frame() 
+
+colnames(Beta) <- c('Name', 'Value')
+
+Beta
+Beta$Value <- Beta$Value %>% as.character() %>% as.numeric() ##這是標準用來轉換成數值變數的過程。
+
+Beta <- Beta %>%
+  arrange(desc(Value))
+
+ggplot( data = Beta) + 
+  geom_bar(aes( x = factor(Name, levels = as.character(Beta$Name)), 
+             y = Value, 
+             fill = Name),stat = 'identity') + 
+    labs( x = 'Variable',
+          y = 'Beta Coefficient',
+          title = 'Beta Coefficient of Model.All') + coord_flip() + theme_bw()
+
+##  coord_flip(), switch the x and y axes to horizontal direction.
+```
+
+## 用更新資料分區域預測
+
+這邊納入了一個新觀念：`交互作用(interaction)`，在前面的建模過程中，我們觀察到不同門市類型的平假日表現可能有所不同，因此我們用`Var1 * Var2`這樣的方式表示兩個變數間互相的影響，會對目標變數造成什麼樣的效果。
+
+> 在前面，#### 各店間的平假日銷售分配，促發了這邊的討論。
+> Type部分 1 2是一組，為百貨店。 3 4是一組，為獨立店。
+
+```{r}
+DataRenewA <- SalesDataRenew %>% filter( Region %in% 'A')
+DataRenewB <- SalesDataRenew %>% filter( Region %in% 'B')
+
+
+Model.A.All <- lm( Sales ~ .+ Type * Weekday, data = DataRenewA[,-c(1,2)])
+Model.B.All <- lm( Sales ~ .+ Type * Weekday , data = DataRenewB[,-c(1,2)])
+```
+
+1. 原本的模型(沒有Holiday相關資料），R^2: 
+
+Multiple R-squared:  0.8432,	Adjusted R-squared:  0.8403 
+Multiple R-squared:  0.5438,	Adjusted R-squared:  0.5362 
+
+Holiday, Multiple R-squared:  0.004669,	Adjusted R-squared:  0.003987 
+Event, Multiple R-squared:  0.04023,	Adjusted R-squared:  0.03957 
+
+2. 後來的模型（不分區域）R^2: 0.8221 | 0.82 
+
+3. 最終的模型（有分區域），R^2: 
+
+Multiple R-squared:  0.8717,	Adjusted R-squared:  0.8688 
+Multiple R-squared:  0.7738,	Adjusted R-squared:  0.7687 
+
+你會發現，有做區域區分，起手式就對了一半。
+
+```{r}
+summary(Model.A.All )
+```
+
+```{r}
+summary(Model.B.All)
+```
+
+### 用視覺化圖表來檢視目前的成果
+
+Regional A Store 1 & 4
+```{r}
+ggplot( data = DataRenewA) + 
+  geom_point( aes(x = c(1:730), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:730),
+                  y = Model.A.All$fitted.values,
+                  colour = 'red'))
+```
+
+Regional B Store 2 & 3
+```{r}
+ggplot( data = DataRenewB) + 
+  geom_point( aes(x = c(1:730), y = Sales), size = 0.2) + 
+  geom_line( aes( x = c(1:730),
+                  y = Model.B.All$fitted.values,
+                  colour = 'red'))
+```
+
+### 探討模型的準確度及誤差
+
+#### 誤差：以`RMSE`衡量(Root-Mean-Square Error)。square root means 開根號。
+
+- 店一 （Region A）
+```{r}
+RMSE <- function( predict, actual){
+  result <- sqrt(mean((predict - actual) ^ 2))
+  return(result)
+}
+
+cat('RegionA 第一間店 模型的RMSE：\n',RMSE(Model.A.All$fitted.values[1:365], DataRenewA$Sales[1:365]),'\n',sep = '')
+```
+
+- 店二（Region B）
+```{r}
+cat('RegionB 第二間店 模型的RMSE：\n',RMSE(Model.B.All$fitted.values[1:365], DataRenewB$Sales[1:365]),'\n',sep ='')
+```
+
+- 店三（Region B）
+```{r}
+cat('RegionB 第三間店 模型的RMSE：\n',RMSE(Model.B.All$fitted.values[366:730], DataRenewB$Sales[366:730]),'\n',sep ='')
+```
+
+- 店四（Region A）
+```{r}
+RMSE <- function( predict, actual){
+  result <- sqrt(mean((predict - actual) ^ 2))
+  return(result)
+}
+
+cat('RegionA 第四間店 模型的RMSE：\n',RMSE(Model.A.All$fitted.values[366:730], DataRenewA$Sales[366:730]),'\n',sep = '')
+```
+
+
+#### 以MAPE衡量(Mean Absolute Percentage Error)
+
+第一階段（尚未有Holiday）的資料，各店誤差為：
+
+10.5%
+9.8%
+9.1%
+6.6%
+
+Now,
+
+10.5% -> 9.7%
+9.8% -> 6.6%
+9.1% -> 7.9%
+6.6% -> 5.9%
+
+很讚！這就是精心設計迴歸模型的過程！
+
+
+- 店一 （Region A）
+```{r}
+MAPE <- function( predict, actual){
+  result <- mean(abs((predict - actual)/actual)) %>% round(3) * 100
+  return(result)
+}
+
+cat('RegionA 第一間店 模型的MAPE：\n',MAPE(Model.A.All$fitted.values[1:365], DataRenewA$Sales[1:365]),'%','\n',sep='')
+```
+
+- 店二（Region B）
+
+```{r}
+cat('RegionB 第二間店 模型的MAPE：\n',MAPE(Model.B.All$fitted.values[1:365], DataRenewB$Sales[1:365]),'%','\n',sep='')
+```
+
+- 店三（Region B）
+
+```{r}
+cat('RegionB 第三間店 模型的MAPE：\n',MAPE(Model.B.All$fitted.values[366:730], DataRenewB$Sales[366:730]),'%','\n',sep='')
+```
+
+- 店四（Region A）
+
+```{r}
+cat('RegionA 第四間店 模型的MAPE：\n',MAPE(Model.A.All$fitted.values[366:730], DataRenewA$Sales[366:730]),'%','\n',sep='')
+```
+
+## 連鎖餐飲區域經理的決策
 
