@@ -74,6 +74,7 @@ Adjusted R-squared ：0.6917
 
 ```{r}
 summary(Model.B.interaction)
+Model.B.interaction$effects
 ```
 
 
