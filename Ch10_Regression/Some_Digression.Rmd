@@ -104,6 +104,22 @@ getMethod("chol2inv", "diagonalMatrix")
 ### About Statistics in Regression
 
 1. `R^2`的大小究竟有沒有「很有差」？真的有必要努力提升這個數字嗎？甚至Adjusted R^2，出現負的，怎麼搞？
+
+R-squared cannot determine whether the coefficient estimates and predictions are biased, which is why you must assess the residual plots. (這是為什麼，課程中，我們還要用`geom_line`和`geom_point`來看預測值與原始值的狀況，看看有沒有高估低估之類的。)
+
+the links: 
+
+[](https://blog.minitab.com/blog/adventures-in-statistics-2/how-to-interpret-a-regression-model-with-low-r-squared-and-low-p-values)
+
+[](https://blog.minitab.com/blog/adventures-in-statistics-2/regression-analysis-how-do-i-interpret-r-squared-and-assess-the-goodness-of-fit)
+
+[](https://blog.minitab.com/blog/adventures-in-statistics-2/regression-analysis-how-do-i-interpret-r-squared-and-assess-the-goodness-of-fit)
+
+the DEF of the Adjusted-R^2
+
+[](https://learningstatisticswithr.com/book/regression.html)
+
+
 2. `t test`沒過，就要剔除嗎？萬一本質上他是控制變數也沒差不是嗎？（當然也可以嘗試變數轉換）
 3. 變數轉換，眾多轉換的方式上，我怎麼知道哪個可能有效？或者有效率地去處理這個環節，我想這也是data preprocessing的一環。
 4. 建立交乘項，是否是屬於Model Selection的一環，那過程中怎麼做衡量？（在上面電子書可能有幫助）
