@@ -1,0 +1,29 @@
+---
+title: "Digression_on_some_Rprogramming"
+author: "PoMingChen"
+date: "8/15/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### What's the different between `merge()`, and `xx_join()`?
+
+[](http://blog.espol.edu.ec/nemo/2013/12/23/merge-data-a-review-of-the-differences-between-merge-inner-join-left-join-right-join-full-join-cbind-and-rbind-when-used-data-table-objects-in-r/)
+
+
+[](http://zevross.com/blog/2014/04/30/mini-post-for-large-tables-in-r-dplyrs-function-inner_join-is-much-faster-than-merge/)
+
+- 這篇的內容很簡單，就是如下，By Hadley Wickam
+
+join is a plyr function. dplyr has inner_join, left_join, semi_join and anti_join.  The advantages of the dplyr versions over merge are:
+
+* rows are kept in existing order
+* much faster
+* tells you what keys you're merging by (if you don't supply)
+* also work with database tables.
+
+

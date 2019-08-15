@@ -1,0 +1,156 @@
+---
+title: "Lecture_Logistic"
+author: "PoMingChen"
+date: "8/15/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Env setting
+
+```{r}
+library("tidyverse")
+library("magrittr")
+```
+
+```{r message=FALSE}
+internal.data <- read_csv("internal_data.csv") 
+head(internal.data)
+internal.data$credit_card_vendor <- as.factor(internal.data$credit_card_vendor) ##發卡信用卡單位，必定是factor
+# internal.data$user_id #user_id，必定是character
+```
+
+```{r message=FALSE}
+survey.data <- read_csv("survey_data.csv")
+```
+
+```{r message=FALSE}
+colnames(internal.data)
+```
+
+- "user_id"            
+- "dm_message"         
+- "dm_post"           
+- "dm_email"           
+- "credit_card_vendor"
+- "credit_card_bonus"  
+- "coupon"   
+
+```{r message=FALSE}
+colnames(survey.data)
+```
+
+- "user_id"         
+- "is_loyal"        
+- "depart_on_time"  
+- "arrive_on_time"  
+- "register_method" 
+- "register_rate" (註冊方式滿意度)
+- "class"           
+- "seat_rate"    (座艙滿意度)   
+- "meal_rate"    (餐點滿意度)
+- "flight_rate"  (航班滿意度)  
+- "package_rate" (行李滿意度)    
+- "tv_ad"        (有看過電視廣告)
+- "youtube_ad_1" (有看過youtube廣告1)
+- "youtube_ad_2" (有看過youtube廣告2)  
+- "youtube_ad_3" (有看過youtube廣告3)  
+
+```{r}
+complete.data.test <- internal.data %>% inner_join(x=., y=survey.data, by="user_id")
+complete.data <- internal.data %>% merge(x=., y=survey.data, by="user_id")
+```
+
+```{r}
+# 底下用`dummy.data.frame`會不成功，可能跟資料本身是tibble/data.frame有關係
+class(complete.data.test)
+class(complete.data)
+```
+
+
+```{r message=FALSE}
+complete.data.test$credit_card_bonus <- as.factor(complete.data.test$credit_card_bonus)
+complete.data.test$register_method <- as.factor(complete.data.test$register_method) 
+complete.data.test$class <- as.factor(complete.data.test$class)
+```
+
+
+```{r message=FALSE}
+complete.data$credit_card_bonus <- as.factor(complete.data$credit_card_bonus)
+complete.data$register_method <- as.factor(complete.data$register_method) 
+complete.data$class <- as.factor(complete.data$class)
+```
+
+
+```{r}
+complete.data.test %>% class()
+complete.data %>% class()
+```
+
+## Data Transformation
+
+> In situations where we have categorical variables (factors) but need to use them in analytical methods that require numbers (for example, K nearest neighbors (KNN), Linear Regression), we need to create dummy variables.
+
+[Useful Link1](https://subscription.packtpub.com/book/big_data_and_business_intelligence/9781783989065/1/ch01lvl1sec21/creating-dummies-for-categorical-variables)
+
+[Useful Link2](https://www.r-bloggers.com/conversion-between-factor-and-dummies-in-r/)
+
+```{r}
+library(dummies) ##Create dummy/indicator variables flexibly and efficiently
+```
+
+
+> #The `dummy.data.frame` can only use in the data.frame, tibble is not acceptable. So, there is a need to convert the factor(catogerical vaiables) to dummy on my own. Here is a small practice(and realize) follow the two links above.
+
+> 這邊算是老師用的`merge`這個函數本身的限制。他的output是一個dataframe，縱使我當初給的兩個都是tibble。那`dummy.data.frame` 只能用在data.frame，自然`inner_join`是出來還是tibble，所以就會產生問題。
+
+> 另外也稍微複習到`model.matrix`轉乘dummy，with intercept and without intercept的兩種可能性。
+
+```{r}
+complete.data.test.new2 <-  dummy.data.frame(complete.data.test, 
+                                            sep = "_",
+                                            dummy.classes = 'factor')
+```
+
+```{r}
+predict(dummyVars(~ credit_card_vendor+credit_card_bonus+register_method+class, 
+            data = complete.data.test,
+            sep = "_",
+            fullRank = F), newdata = complete.data.test) %>% as_tibble() -> Dummy.Table
+
+## fullRank parameter: If TRUE, factors are encoded to be consistent with model.matrix(with intercept) and the resulting there are no linear dependencies induced between the columns.
+```
+
+
+```{r}
+complete.data.test %<>% cbind(Dummy.Table)
+complete.data.test %>% colnames()
+complete.data.test %<>% select(1:4, -c(5:6), 22:24, 25:28, 7:10, c(-11,-13), 29:32, 33:35,12:21) 
+
+complete.data.test %<>% select(1:19, 23, 20:22, -24, 25:32)
+
+complete.data.test
+```
+
+
+#### 老師的方法
+```{r}
+complete.data.new <- dummy.data.frame(complete.data,
+                                      sep = "_", 
+                                      dummy.classes = 'factor')
+##sep = "_"；For the names of the created dummy variables, sep is the character used between the variable name and the value. (e.g. State_NY, State_PA , State_CA，中間那個底槓你如何用來表達新產生的眾多新變數之區分)
+
+##dummy.classes = 'factor'；A vector of classes names for which dummy variables are created(e.g.你想要針對哪一種類型的變數，轉換成Dummy，dummy.classes = 'factor'就是針對factor的變數
+```
+
+
+```{r}
+##到目前為止，用老師方法和自己轉的都ok了。 原則上只要cor reshape系列畫出來的圖ok就沒問題。
+complete.data %>% colnames()
+complete.data.test %>% colnames() 
+complete.data.new %>% colnames()
+```
+
