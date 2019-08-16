@@ -18,6 +18,7 @@ library("reshape2")
 library("InformationValue")
 library("plotROC")
 library("plotly")
+library("dummies")
 ```
 
 ```{r message=FALSE}
@@ -106,37 +107,39 @@ complete.data %>% class()
 library(dummies) ##Create dummy/indicator variables flexibly and efficiently
 ```
 
-
-> #The `dummy.data.frame` can only use in the data.frame, tibble is not acceptable. So, there is a need to convert the factor(catogerical vaiables) to dummy on my own. Here is a small practice(and realize) follow the two links above.
+> The `dummy.data.frame` can only use in the data.frame, tibble is not acceptable. So, there is a need to convert the factor(catogerical vaiables) to dummy on my own. Here is a small practice(and realize) follow the two links above.
 
 > 這邊算是老師用的`merge`這個函數本身的限制。他的output是一個dataframe，縱使我當初給的兩個都是tibble。那`dummy.data.frame` 只能用在data.frame，自然`inner_join`是出來還是tibble，所以就會產生問題。
 
 > 另外也稍微複習到`model.matrix`轉乘dummy，with intercept and without intercept的兩種可能性。
 
+> 後來發現`dummyVars()` 是`caret`package的，那他也有`confusionMatrix()`，但是引入方式不同，會與`InformationValue()`的衝到，因此就全部註解。
+
 ```{r}
+#無效
 complete.data.test.new2 <-  dummy.data.frame(complete.data.test, 
                                             sep = "_",
                                             dummy.classes = 'factor')
 ```
 
 ```{r}
-predict(dummyVars(~ credit_card_vendor+credit_card_bonus+register_method+class, 
-            data = complete.data.test,
-            sep = "_",
-            fullRank = F), newdata = complete.data.test) %>% as_tibble() -> Dummy.Table
+# predict(dummyVars(~ credit_card_vendor+credit_card_bonus+register_method+class, 
+#             data = complete.data.test,
+#             sep = "_",
+#             fullRank = F), newdata = complete.data.test) %>% as_tibble() -> Dummy.Table
 
 ## fullRank parameter: If TRUE, factors are encoded to be consistent with model.matrix(with intercept) and the resulting there are no linear dependencies induced between the columns.
 ```
 
 
 ```{r}
-complete.data.test %<>% cbind(Dummy.Table)
-complete.data.test %>% colnames()
-complete.data.test %<>% select(1:4, -c(5:6), 22:24, 25:28, 7:10, c(-11,-13), 29:32, 33:35,12:21) 
-
-complete.data.test %<>% select(1:19, 23, 20:22, -24, 25:32)
-
-complete.data.test
+# complete.data.test %<>% cbind(Dummy.Table)
+# complete.data.test %>% colnames()
+# complete.data.test %<>% select(1:4, -c(5:6), 22:24, 25:28, 7:10, c(-11,-13), 29:32, 33:35,12:21) 
+# 
+# complete.data.test %<>% select(1:19, 23, 20:22, -24, 25:32)
+# 
+# complete.data.test
 ```
 
 
@@ -154,8 +157,8 @@ complete.data.new <- dummy.data.frame(complete.data,
 ```{r}
 ##到目前為止，用老師方法和自己轉的都ok了。 原則上只要cor reshape系列畫出來的圖ok就沒問題。
 complete.data %>% colnames()
-complete.data.test %>% colnames() 
 complete.data.new %>% colnames()
+# complete.data.test %>% colnames() 
 ```
 
 ## EDA
@@ -167,7 +170,7 @@ cor(complete.data.new[, 2:ncol(complete.data.new)])[1:5, 1:5]
 ```
 
 ```{r}
-cor(complete.data.test[, 2:ncol(complete.data.test)])[1:5, 1:5]
+# cor(complete.data.test[, 2:ncol(complete.data.test)])[1:5, 1:5]
 ```
 
 我通常喜歡使用熱圖 (heatmap) 視覺化變數間的相關程度，如果要使用 ggplot2 繪製相關係數的熱圖，必須先將資料整理成「變數 1 - 變數 2 - 相關係數」的 data frame，我們可以利用 `reshape2`套件中的melt函數輕鬆把矩陣格式轉換成上述的 data frame。
@@ -177,7 +180,7 @@ head(melt(cor(complete.data.new[, 2:ncol(complete.data.new)])), 5)
 ```
 
 ```{r}
-head(melt(cor(complete.data.test[, 2:ncol(complete.data.test)])), 5)
+# head(melt(cor(complete.data.test[, 2:ncol(complete.data.test)])), 5)
 ```
 
 接著我們就可以用geom_tile(繪製方形圖)繪製相關係數的熱圖囉！
@@ -194,15 +197,15 @@ ggplot(melt(cor(complete.data.new[, 2:ncol(complete.data.new)])),
 ```
 
 ```{r}
-ggplot(melt(cor(complete.data.test[, 2:ncol(complete.data.new)])),
-       aes(Var1, Var2)) +
-  geom_tile(aes(fill = value), colour = "white") + ## color = "white"是為了產生周圍的白色邊框。
-  scale_fill_gradient2(low = "firebrick4", high = "steelblue",
-                       mid = "white", midpoint = 0) +
-  guides(fill=guide_legend(title="Correlation")) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
-        axis.title = element_blank())
+# ggplot(melt(cor(complete.data.test[, 2:ncol(complete.data.new)])),
+#        aes(Var1, Var2)) +
+#   geom_tile(aes(fill = value), colour = "white") + ## color = "white"是為了產生周圍的白色邊框。
+#   scale_fill_gradient2(low = "firebrick4", high = "steelblue",
+#                        mid = "white", midpoint = 0) +
+#   guides(fill=guide_legend(title="Correlation")) +
+#   theme_bw() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+#         axis.title = element_blank())
 ```
 
 ## Data Modeling
@@ -245,7 +248,7 @@ summary(marketing.model)
 ```{r}
 #第二個參數是complete，是原始資料的資料表，就是要用marketing.model來預測他出來的機率是多少？
 predict.prob <- predict(marketing.model, complete.data, type = "response")
-predict.prob 
+predict.prob
 # predict.prob.beta <- predict(marketing.model, complete.data, type = "term")
 ```
 
@@ -262,7 +265,7 @@ opt.cutoff
 ```{r}
 # Calculate Important Assessment Measure
 # confusionMatrix(actuals, predictedScores, threshold = 0.5)
-confusionMatrix(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+InformationValue::confusionMatrix(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
 ```
 
 ```{r}
@@ -273,7 +276,7 @@ misClassError(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
 ```{r}
 #1 是指忠誠的
 #被分類到忠誠的，有多少是真正忠誠的（498/(498+86))
-precision(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+InformationValue::precision(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
 ```
 
 ```{r}
@@ -413,7 +416,7 @@ dm_message
 所以在Model2，只考慮服務品質因素的模型分析，Intercept立足點的那群人，就應該理解為：
 - 註冊方式是用Mobile_app
 - class_1的那群人
-其他服務品質相關因素是否會影響其忠誠度的顯著程度。那若這群人變成Class_2或Class_3，並不會影響其顯著程度。
+其他「服務品質相關因素」是否會影響其忠誠度的顯著程度。那若這群人變成Class_2或Class_3，並不會影響其顯著程度。
 
 所以在Model3，綜合考慮服務品質因素，以及公司行銷因素的模型分析，Intercept立足點的那群人，就應該理解為：
 - 註冊方式是用Mobile_app
@@ -421,7 +424,7 @@ dm_message
 - 信用卡發卡機構為A
 - credit_card_bonus1的那群人，其他服務品質相關因素是否會影響其忠誠度的顯著程度。那若這群人變成Class_2或Class_3，是否會顯著影響其忠誠度，答案是有達到統計顯著性。
 
-因此為什麼 `class2` 和 `class3` 在模型 3 中顯著有正面影響，模型 2 中卻沒有呢？可能就不是很難理解了。因為本質上他們就是兩群不同的，模型3的那群立足點族群，應該是比較不是「飛行常客」等等，而且信用卡的紅利也是最少，因此若是你有給他升等（好比說長榮無限萬哩遊，從綠卡變成金卡）那自然就有很大的影響。
+因此為什麼 `class2` 和 `class3` 在模型 3 中顯著有正面影響，模型 2 中卻沒有呢？可能就不是很難理解了。因為本質上他們就是兩群不同的人，模型3的那群立足點族群，應該是比較不是「飛行常客」等等，而且信用卡的紅利也是最少，因此若是你有給他升等（好比說長榮無限萬哩遊，從綠卡變成金卡）那自然就有很大的影響。
 
 模型二就沒有切割那麼細，自然雜訊比較多，自然沒有那麼顯著。
 
@@ -523,7 +526,6 @@ summary.table <- summary.table[sort(summary.table$coefficient, index.return = T)
 # Set correct variable type
 #（這個方式也ok）
 #summary.table$var_name <- factor(summary.table$var_name, levels = c("dm_message",...一直打下去))
-
 summary.table$var_name <- factor(summary.table$var_name,
                                  levels = summary.table$var_name)
 
@@ -596,7 +598,7 @@ ggplot(data = summary.table2,
 > direct message的方式，主要有"dm_message" "dm_post" "dm_email" 三種方式。
 
 ```{r}
- complete.data.new %>% colnames()
+complete.data.new %>% colnames()
 ```
 
 [About the group_by_](https://github.com/tidyverse/dplyr/blob/34423af89703b0772d59edcd0f3485295b629ab0/vignettes/nse.Rmd)
