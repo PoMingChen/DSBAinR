@@ -16,7 +16,8 @@ library("tidyverse")
 library("magrittr")
 library("reshape2")
 library("InformationValue")
-
+library("plotROC")
+library("plotly")
 ```
 
 ```{r message=FALSE}
@@ -244,10 +245,75 @@ summary(marketing.model)
 ```{r}
 #第二個參數是complete，是原始資料的資料表，就是要用marketing.model來預測他出來的機率是多少？
 predict.prob <- predict(marketing.model, complete.data, type = "response")
-predict.prob
+predict.prob 
+# predict.prob.beta <- predict(marketing.model, complete.data, type = "term")
+```
+
+
+接下來，利用 InformationValue 套件中的函式，可以得到使分類誤差最小的 cutoff probability，以及計算常用的分類好壞指標：
+
+```{r}
+# Calculate cut-off probability minimizing the miscalssification error
+opt.cutoff <- optimalCutoff(complete.data$is_loyal, predict.prob)[1] 
+opt.cutoff
+#找到predict.prob下，最適合的區分臨界機率。
 ```
 
 ```{r}
-
+# Calculate Important Assessment Measure
+# confusionMatrix(actuals, predictedScores, threshold = 0.5)
+confusionMatrix(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
 ```
+
+```{r}
+#(83+133)/1000
+misClassError(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+```
+
+```{r}
+#1 是指忠誠的
+#被分類到忠誠的，有多少是真正忠誠的（498/(498+86))
+precision(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+```
+
+```{r}
+#1 是指忠誠的
+#本質上是忠誠的，有多少比例的被分配到忠誠？
+#498/(133+498)
+sensitivity(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+```
+
+```{r}
+#0 本質上是不忠誠的
+#本質上是1不忠誠的，有多少比例的被分配到不忠誠？
+#283/(283+86)
+specificity(complete.data$is_loyal, predict.prob, threshold = opt.cutoff)
+```
+
+最後，我喜歡利用 `plotROC`套件繪製分類模型的 ROC 曲線，並計算 AUC (Area Under Curve)。模型的 AUC 為 0.837，分類的準確度還算不錯。
+
+```{r}
+predict.table <- data.frame(true_label = complete.data$is_loyal,
+                            predict_prob = predict.prob)
+
+predict.table
+
+# Plot ROC curve and calculate AUC
+#geom_roc is a function in {plotROC} not {ggplot}
+#Given a 
+# binary outcome d and 
+# continuous measurement m
+# computes the empirical ROC curve for assessing the classification accuracy of m（這是為什麼在geom_roc的框架下，aes裡面要寫d m 而不是x y。主要是源自stat_roc()的關係）
+
+basic.plot <- ggplot(predict.table, aes(d = true_label, m = predict.prob)) +
+  geom_roc(n.cuts = 3, labelsize = 3, labelround = 2)
+
+basic.plot + style_roc(x="1-Specificity", y="Sensitivity") + # style_roc for adding guidelines and labels: Adds a diagonal guideline, minor grid lines, and optionally direct labels to ggplot objects containing a geom_roc layer.
+  annotate("text", x = .75, y = .25, size = 5,
+           label = paste("AUC =", round(calc_auc(basic.plot)$AUC, 3)))
+
+#Review：如果你把cut-off point percentage放到1的時候，這時候機率<=1的樣本，都會被認定有罪。這時候你的Sensitivity表現就會很好，因為所有有罪的人都會被抓進來，這是篤定的。
+## 可是這時候你的Specificuty rate就會很低，因為本質上無罪的人，也都被認定有罪了。Specificuty rate＝0，1-Specificuty rate＝1
+```
+
 
