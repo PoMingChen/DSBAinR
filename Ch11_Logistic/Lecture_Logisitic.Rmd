@@ -596,24 +596,24 @@ ggplot(data = summary.table2,
 > direct message的方式，主要有"dm_message" "dm_post" "dm_email" 三種方式。
 
 ```{r}
-# complete.data.new %>% colnames()
+ complete.data.new %>% colnames()
 ```
+
+[About the group_by_](https://github.com/tidyverse/dplyr/blob/34423af89703b0772d59edcd0f3485295b629ab0/vignettes/nse.Rmd)
 
 ```{r}
 # Get the summary table for dm strategies
 
-## try the demo of function if it works
+## (Below)try the demo of loop if it works
 var.names <- c("dm_post", "dm_email", "dm_message")
 summary.table <- complete.data %>%
-    group_by_(treatment = var.names[1]) %>%
+    group_by_(treatment = var.names[1]) %>% ##`group_by_` is the SE VERSION of dplyr main verb. It make it possible to program with dplyr. Rather than just do the verb to the table systemically.
     summarize(num_member = length(user_id),
               num_loyal = sum(is_loyal))
 
-summary.table
-
 summary.table$var_name <- var.names[1] 
 summary.table
-## try the demo of function if it works
+## (Above)try the demo of loop if it works
 
 for(i in 2:3){
   temp <- complete.data %>%
@@ -641,5 +641,107 @@ ggplot(data = summary.table,
   theme_bw(base_size = 14) +
   labs(x = "DM Campaign", y = "Proportion of Loyal Members",
        title = "While DM is useful, mobile message is not a good channel.")
+```
+
+
+### 針對「外部合作部經理」
+
+針對外部合作經理的假說「容易受信用卡里程紅利影響，應找尋適當的信用卡公司合作」，的確是容易受信用卡紅利影響，但是跟是哪一個信用卡公司並沒有特別大的關聯。(反而是紅利回饋談的好不好，比較有影響。)
+
+```{r}
+complete.data %>% colnames()
+```
+
+```{r}
+summary.table <- complete.data %>%
+  group_by(credit_card_vendor) %>%
+  summarize(num_member = length(user_id),
+            num_loyal = sum(is_loyal))
+summary.table$proportion <- summary.table$num_loyal / summary.table$num_member
+
+# Visualize the result
+ggplot(data = summary.table, aes(x = credit_card_vendor, y = proportion)) +
+  geom_bar(aes(fill = credit_card_vendor), position = "dodge", stat = "identity") +
+  theme_bw(base_size = 14) +
+  labs(x = "Credit Card Vendor", y = "Proportion of Loyal Members",
+       title = "While credit card vendors seems to be important ...")
+```
+
+```{r}
+# Get the summary table for credit card vendors and bonus levels
+summary.table <- complete.data %>%
+  group_by(credit_card_vendor, credit_card_bonus) %>%
+  summarize(num_member = length(user_id),
+            num_loyal = sum(is_loyal))
+summary.table$proportion <- summary.table$num_loyal / summary.table$num_member
+
+summary.table
+
+# Set correct data type
+summary.table$credit_card_bonus <- as.factor(summary.table$credit_card_bonus)
+
+# Visualize the result
+ggplot(data = summary.table, aes(x = credit_card_vendor, y = proportion)) +
+  geom_bar(aes(fill = credit_card_bonus), position = "dodge", stat = "identity") +
+  theme_bw(base_size = 14) +
+  labs(x = "Credit Card Vendor", y = "Proportion of Loyal Members",
+       title = "... the root cause is bonus level.")
+```
+
+### 針對「品牌形象部經理」
+
+> 品牌形象廣告，總共有"tv_ad" "youtube_ad_1" "youtube_ad_2" "youtube_ad_3"      
+
+儘管大部分的品牌形象廣告都有正面影響，但我們可以特別注意：
+
+- TV AD 表現非常傑出
+- Youtube Ad 1 有負面影響
+
+所以我會在圖表 title 中特別強調這兩個事件。
+
+```{r}
+complete.data %>% colnames()
+```
+
+
+```{r}
+# Get the summary table for dm strategies
+var.names <- c("tv_ad", "youtube_ad_1", "youtube_ad_2", "youtube_ad_3")
+
+
+### the experiment of the loop
+summary.table <- complete.data %>%
+    group_by_(treatment = var.names[1]) %>%
+    summarize(num_member = length(user_id),
+              num_loyal = sum(is_loyal))
+summary.table$var_name <- var.names[1] 
+
+
+
+for(i in 2:4){
+  temp <- complete.data %>%
+    group_by_(treatment = var.names[i]) %>%
+    summarize(num_member = length(user_id),
+              num_loyal = sum(is_loyal))
+  temp$var_name <- var.names[i] 
+  summary.table <- rbind(summary.table, temp)
+}
+summary.table$proportion <- summary.table$num_loyal / summary.table$num_member
+
+summary.table
+
+# Set the correct variavle type
+summary.table$treatment <- as.factor(summary.table$treatment)
+summary.table$var_name <- as.factor(summary.table$var_name)
+
+# Plot the result
+ggplot(data = summary.table,
+       aes(x = var_name, y = proportion)) +
+  geom_bar(aes(fill = treatment),
+           position = "dodge",
+           stat = "identity") +
+  theme_bw(base_size = 14) +
+  labs(x = "Advertisement", y = "Proportion of Loyal Members",
+       title = "TV Ad is very strong, but Youtube Ad1 is problematic.")
 ```
 
