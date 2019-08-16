@@ -316,4 +316,330 @@ basic.plot + style_roc(x="1-Specificity", y="Sensitivity") + # style_roc for add
 ## 可是這時候你的Specificuty rate就會很低，因為本質上無罪的人，也都被認定有罪了。Specificuty rate＝0，1-Specificuty rate＝1
 ```
 
+### 只考慮外部問卷（服務品質因素）的模型 分析
+
+接著我們建立的是單純只考量「服務品質」的邏輯回歸模型，跟前一個模型比較起來，AIC 稍微高了些，代表行銷活動對於客戶忠誠與否還是相當有影響力的。我們可以使用 summary 函數輸出各個變數的係數估計與 p-值：
+
+對客戶忠誠度有顯著正面影響 (α=0.05) 的變數：
+depart_on_time, arrive_on_time, seat_rate, meal_rate, flight_rate, package_rate
+對客戶忠誠度有顯著負面影響 (α=0.05) 的變數：
+None
+
+
+```{r}
+service.model <- glm(is_loyal ~
+                     depart_on_time + 
+                     arrive_on_time +
+                     register_method + 
+                     register_rate +
+                     class + 
+                     seat_rate + 
+                     meal_rate +
+                     flight_rate + 
+                     package_rate,
+                     data=complete.data, family=binomial(link="logit"))
+
+summary(service.model)
+```
+
+```{r}
+predict.prob2 <- predict(service.model, complete.data, type="response")
+opt.cutoff2 <- optimalCutoff(complete.data$is_loyal, predict.prob2)[1] 
+opt.cutoff2
+```
+
+
+這邊值得留意，今天我在意顧客是否忠誠，所以我會比較在意"1"那排的表現。而且`complete.data$is_loyal`就已經是針對indicator = 1, they are loyal的那群人。
+```{r}
+confusionMatrix(complete.data$is_loyal, predict.prob2, threshold = opt.cutoff2)
+```
+
+```{r}
+#(149+98)/1000
+misClassError(complete.data$is_loyal, predict.prob2, threshold = opt.cutoff2)
+```
+
+```{r}
+#533/(533+149)
+precision(complete.data$is_loyal, predict.prob2, threshold = opt.cutoff2)
+```
+
+```{r}
+#本質上是忠誠的，有多少比例被模型認定是忠誠的？
+#(533)/(533+98)
+sensitivity(complete.data$is_loyal, predict.prob2, threshold = opt.cutoff2)
+```
+
+```{r}
+#本質上是1不忠誠的，有多少比例被模型認定是不忠誠的？
+#220/(220+149)
+specificity(complete.data$is_loyal, predict.prob2, threshold = opt.cutoff2)
+```
+
+最後從 ROC 曲線與 AUC 也可以知道只考量服務品質的模型不如只考量行銷活動的模型，代表航空公司的行銷確實有所作用。（意思是公司行銷確實會影響到顧客忠誠度）
+```{r}
+predict.table2 <- data.frame(true_label = complete.data$is_loyal,
+                            predict_prob2 = predict.prob2)
+
+# Plot ROC curve and calculate AUC
+basic.plot <- ggplot(predict.table2, aes(d = true_label, m = predict.prob2)) +
+  geom_roc(n.cuts = 3, labelsize = 3, labelround = 2)
+
+basic.plot + style_roc(xlab = "1-Specificity", ylab = "Sensitivity") +
+  annotate("text", x = .75, y = .25, size = 5,
+           label = paste("AUC =", round(calc_auc(basic.plot)$AUC, 3)))
+```
+
+單純考慮公司行銷的分類模型，效率是0.837，單純只考慮公司服務品質的分類模型，效率是0.784，顯示出其實（公司行銷）對於顧客忠誠度有其影響。
+
+因此我們來看看考慮這兩個面向影響因素，對於顧客忠誠度的分類預測影響。
+
+### 考慮包含「行銷活動」與「服務品質」的模型 分析
+
+接下來，我們納入所有解釋變數建立邏輯迴歸模型進行分析。
+
+對客戶忠誠度有顯著正面影響 (α=0.05) 的變數：
+depart_on_time, arrive_on_time, class2, class3, seat_rate, meal_rate, flight_rate, credit_card_bonus3, credit_card_bonus4, tv_ad, youtube_ad_2
+
+對客戶忠誠度有顯著負面影響 (α=0.05) 的變數：
+dm_message
+
+問題：為什麼 `class2` 和 `class3` 在模型 3 中顯著有正面影響，模型 2 中卻沒有呢？
+
+> 這邊我有小小疑問了，為什麼不是用data = complete.data.new，然後解釋變數也要加入credit_card_vendorVendor A, credit_card_vendorVendor B, credit_card_vendorVendor C之類的解釋變數。
+
+> 理由是因為glm針對那些資料型態為factor的，貼心地轉為虛擬變數（像是class1 2 3，結果就只會跑出class 2 3，因為class1 = 1-class2-class3），就跟model.matrix的狀況很像。
+
+所以在Model2，只考慮服務品質因素的模型分析，Intercept立足點的那群人，就應該理解為：
+- 註冊方式是用Mobile_app
+- class_1的那群人
+其他服務品質相關因素是否會影響其忠誠度的顯著程度。那若這群人變成Class_2或Class_3，並不會影響其顯著程度。
+
+所以在Model3，綜合考慮服務品質因素，以及公司行銷因素的模型分析，Intercept立足點的那群人，就應該理解為：
+- 註冊方式是用Mobile_app
+- class_1
+- 信用卡發卡機構為A
+- credit_card_bonus1的那群人，其他服務品質相關因素是否會影響其忠誠度的顯著程度。那若這群人變成Class_2或Class_3，是否會顯著影響其忠誠度，答案是有達到統計顯著性。
+
+因此為什麼 `class2` 和 `class3` 在模型 3 中顯著有正面影響，模型 2 中卻沒有呢？可能就不是很難理解了。因為本質上他們就是兩群不同的，模型3的那群立足點族群，應該是比較不是「飛行常客」等等，而且信用卡的紅利也是最少，因此若是你有給他升等（好比說長榮無限萬哩遊，從綠卡變成金卡）那自然就有很大的影響。
+
+模型二就沒有切割那麼細，自然雜訊比較多，自然沒有那麼顯著。
+
+
+```{r}
+# complete.data.new %>% colnames()
+# survey.data %>% colnames()
+```
+
+```{r}
+full.model <- glm(is_loyal ~ depart_on_time + arrive_on_time +
+                    register_method + register_rate +
+                    class + seat_rate + meal_rate +
+                    flight_rate + package_rate +
+                    dm_message + dm_post + dm_email +
+                    credit_card_vendor + credit_card_bonus +
+                    tv_ad + youtube_ad_1 + youtube_ad_2 + youtube_ad_3,
+                  data = complete.data,
+                  family = binomial(link="logit"))
+
+summary(full.model)
+```
+
+從各項分類指標來看，模型 3 在分類表現較模型 1 與模型 2 好。
+```{r}
+predict.prob3 <- predict(full.model, complete.data, type="response")
+opt.cutoff3 <- optimalCutoff(complete.data$is_loyal, predict.prob3)[1] 
+```
+
+```{r}
+misClassError(complete.data$is_loyal, predict.prob3, threshold = opt.cutoff3)
+```
+
+```{r}
+confusionMatrix(complete.data$is_loyal, predict.prob3, threshold = opt.cutoff3)
+```
+
+```{r}
+#598/660 = 0.906
+precision(complete.data$is_loyal, predict.prob3, threshold = opt.cutoff3)
+```
+
+
+```{r}
+#598/(598+33) = 0.9477
+sensitivity(complete.data$is_loyal, predict.prob3, threshold = opt.cutoff3)
+```
+
+```{r}
+#307/(307+62) = 0.8319
+specificity(complete.data$is_loyal, predict.prob3, threshold = opt.cutoff3)
+```
+
+模型 3 的 AUC=0.971，代表分類表現非常佳，有較強的區分能力。(全部猜對=1)
+```{r}
+predict.table <- data.frame(true_label = complete.data$is_loyal,
+                            predict.prob3 = predict.prob3)
+
+# Plot ROC curve and calculate AUC
+basic.plot <- ggplot(predict.table, aes(d = true_label, m = predict.prob3)) +
+  geom_roc(n.cuts = 3, labelsize = 3, labelround = 2)
+basic.plot + style_roc(xlab = "1-Specificity", y="Sensitivity") +
+  annotate("text", x = .75, y = .25, size = 5,
+           label = paste("AUC =", round(calc_auc(basic.plot)$AUC, 3))) 
+#calc_auc(), Given a ggplot object with a GeomRoc layer, computes the area under the ROC curve for each group
+```
+
+## 製作與主管報告的圖表
+
+通常在建立完模型後，我會花一些時間製作能夠讓人一看就明白的圖表，協助非相關背景的同事們了解模型到底說明了什麼。˙
+
+### 視覺化「邏輯迴歸」的結果
+
+由於行銷變數都是 0 / 1 的虛擬變數 (dummy variable)，scale 是一致的，所以 __我們可以直接比較邏輯迴歸中係數的大小__，而係數大小代表的是「每個變數對於客戶忠誠度 odds 的影響程度」。
+
+我喜歡 __用橫向的 Bar Chart __去視覺化迴歸係數，大家可以參考以下程式碼。
+
+> 值得注意的是，DM 相關的行銷策略表現在「同時考量服務品質與行銷策略」的模型 3 中時在表現得太差，所以我並不一定會真得呈現這個結果，或是會用稍微委婉的方式去說明這個結果。
+
+```{r}
+# Get the coefficient table
+summary.table <- data.frame(var_name = names(coefficients(full.model)),
+                            coefficient = coefficients(full.model)) ## LM的章節也是用這個方法
+
+summary.table
+
+# Filter marketing-related variables(我只要看那些外部行銷的係數，這是未來要改善的方向以及預算規劃決定)
+summary.table <- summary.table %>%
+  filter(var_name %in% names(coefficients(marketing.model)) &
+           var_name != "(Intercept)")
+
+summary.table
+
+# Sort the table by the size of coefficients
+# summary.table %>% arrange((coefficient))(這個方式也ok)
+summary.table <- summary.table[sort(summary.table$coefficient, index.return = T)$ix, ]
+
+
+# Set correct variable type
+#（這個方式也ok）
+#summary.table$var_name <- factor(summary.table$var_name, levels = c("dm_message",...一直打下去))
+
+summary.table$var_name <- factor(summary.table$var_name,
+                                 levels = summary.table$var_name)
+
+# Visualize the bar chart
+ggplot(data = summary.table,
+       aes(x = var_name, y = coefficient)) +
+       geom_bar(aes(fill = var_name),
+           position = "dodge",
+           stat = "identity",
+           show.legend = FALSE) +
+  theme_bw(base_size = 12) + # base_size is for base font size
+  labs(title = "Direct marketing approach is not that useful ...",
+       x = "Marketing Strategy", y = "Impact on Cusomer Loyalty") +
+  coord_flip() 
+```
+
+實際上在報告時，我更可能放的圖是「模型 1」的結果，一來是與「模型 3」的結果並沒有差太大，二來是仍然一些不顯著（ __像是dm_post, dm_email, youtube_ad_1等__）但仍然有正面效果的行銷策略看起來仍然是重要的。
+
+#### Model1
+對客戶忠誠度有顯著正面影響 (α=0.05) 的變數：
+dm_post, dm_email, credit_card_bonus3, credit_card_bonus4, tv_ad, youtube_ad_2
+
+對客戶忠誠度有顯著負面影響 (α=0.05) 的變數：
+dm_message, __youtube_ad_1__
+
+#### Model3
+
+對客戶忠誠度有顯著正面影響 (α=0.05) 的變數：
+ ~~depart_on_time, arrive_on_time, class2, class3, seat_rate, meal_rate, flight_rate~~, credit_card_bonus3, credit_card_bonus4, tv_ad, youtube_ad_2
+
+對客戶忠誠度有顯著負面影響 (α=0.05) 的變數：
+dm_message
+
+```{r}
+summary.table2 <- data.frame(var_name = names(coefficients(marketing.model)),
+                            coefficient = coefficients(marketing.model))
+
+summary.table2 <- summary.table2 %>%
+  filter(var_name != "(Intercept)")
+
+summary.table2
+
+# Sort the table by the size of coefficients
+summary.table2 <- summary.table2[sort(summary.table2$coefficient, index.return = T)$ix, ]
+
+# Set correct variable type
+summary.table2$var_name <- factor(summary.table2$var_name,
+                                 levels = summary.table2$var_name)
+
+# Visualize the bar chart
+ggplot(data = summary.table2,
+       aes(x = var_name, y = coefficient)) +
+  geom_bar(aes(fill = var_name),
+           position = "dodge",
+           stat = "identity",
+           show.legend = FALSE) +
+  theme_bw(base_size = 12) +
+  labs(title = "While most strategies are effective, we should
+          reconsider Youtube Ad 1 and text message.",
+       x = "Marketing Strategy", y = "Impact on Cusomer Loyalty") +
+  coord_flip() #直接右轉90度
+```
+
+### 針對「客戶行銷部經理」
+
+針對客戶行銷部分，最緊急的問題應該是 dm_message 會影發客戶的反感，但也有可能是再進行問卷時的 selection bias，需要更仔細的釐清問題。
+
+我喜歡用 Bar Chart 去呈現不同組別的情況（如果組別數太多的話就會使用 Line Chart），從這張圖可以清楚說明：其他行銷成效是有用的，但 dm_message 卻造成忠誠客戶的比率降低。
+
+> direct message的方式，主要有"dm_message" "dm_post" "dm_email" 三種方式。
+
+```{r}
+# complete.data.new %>% colnames()
+```
+
+```{r}
+# Get the summary table for dm strategies
+
+## try the demo of function if it works
+var.names <- c("dm_post", "dm_email", "dm_message")
+summary.table <- complete.data %>%
+    group_by_(treatment = var.names[1]) %>%
+    summarize(num_member = length(user_id),
+              num_loyal = sum(is_loyal))
+
+summary.table
+
+summary.table$var_name <- var.names[1] 
+summary.table
+## try the demo of function if it works
+
+for(i in 2:3){
+  temp <- complete.data %>%
+    group_by_(treatment = var.names[i]) %>%
+    summarize(num_member = length(user_id),
+              num_loyal = sum(is_loyal))
+  temp$var_name <- var.names[i] 
+  summary.table <- rbind(summary.table, temp)
+}
+
+summary.table$proportion <- summary.table$num_loyal / summary.table$num_member
+
+# Set the correct variavle type
+summary.table$treatment <- as.factor(summary.table$treatment)
+summary.table$var_name <- as.factor(summary.table$var_name)
+
+summary.table
+
+# Plot the result
+ggplot(data = summary.table,
+       aes(x = var_name, y = proportion)) +
+  geom_bar(aes(fill = treatment),
+           position = "dodge",
+           stat = "identity") +
+  theme_bw(base_size = 14) +
+  labs(x = "DM Campaign", y = "Proportion of Loyal Members",
+       title = "While DM is useful, mobile message is not a good channel.")
+```
 
