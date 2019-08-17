@@ -1,0 +1,213 @@
+---
+title: "HW_Logisitic"
+author: "PoMingChen"
+date: "8/17/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 注意事項
+
+設置工作路徑，並確定兩個資料集合都放置在你的工作路徑：
+`setwd("你的完整工作路徑名稱")`
+檔案的編碼皆為UTF-8，讀取檔案時請注意：
+### 讀成data.frame
+`read.csv('檔案名稱', encoding = 'UTF-8')`
+### 讀成tibble
+`read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
+
+
+## Env Setting
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(InformationValue)
+library(dummies)
+library(plotROC)
+```
+
+
+```{r}
+internal.data <- read_csv("./internal_data.csv", locale = locale(encoding = "UTF-8"))
+survey.data <- read_csv("./survey_data.csv", locale = locale(encoding = "UTF-8"))
+```
+
+## Data Transformation
+
+```{r}
+head(internal.data)
+internal.data$credit_card_vendor <- as.factor(internal.data$credit_card_vendor)
+internal.data$credit_card_bonus <- as.factor(internal.data$credit_card_bonus)
+internal.data %>% head()
+```
+
+
+```{r}
+survey.data %>% head()
+survey.data$register_method <- as.factor(survey.data$register_method)
+survey.data$class <- as.factor(survey.data$class)
+survey.data
+```
+
+```{r}
+complete.data <- internal.data %>% merge(x=., 
+                                         y=survey.data, 
+                                         by="user_id")
+```
+
+```{r}
+complete.data %>% head()
+```
+
+## 題目一
+
+1. 在完整的邏輯迴歸模型 (full.model) 中，哪些變數在顯著水準為 0.01 下顯著不為0？請利用這些變數，建立新的邏輯迴歸模型，命名為 final.model。
+
+在完整的邏輯迴歸模型 (full.model) 中，哪些變數在顯著水準為 0.01下顯著不為零的有：
+depart_on_time, arrive_on_time, class2, class3, seat_rate, meal_rate, flight_rate, dm_message, credit_card_bonus3, credit_card_bonus4, tv_ad, youtube_ad_2
+
+```{r}
+final.model <- glm(is_loyal~depart_on_time+
+                            arrive_on_time+
+                            class+
+                            seat_rate+
+                            meal_rate+
+                            flight_rate+
+                            dm_message+
+                            credit_card_bonus+
+                            tv_ad+
+                            youtube_ad_2, 
+                            data = complete.data,
+                            family = binomial(link = "logit"))
+```
+
+```{r}
+summary(final.model)
+```
+
+```{r}
+predict.prob <- predict(final.model, complete.data ,type = "response") ## 這組寫法比較難記，遇到時再多回來參考，可是他很必要。（加上Help提示滿少的）
+```
+
+
+```{r}
+optCutoff <- optimalCutoff(actuals = complete.data$is_loyal, predictedScores = predict.prob)[1]
+optCutoff
+```
+
+2. 請計算 final.model 的模糊矩陣、precision、specificity、sensitivity。
+
+```{r}
+confusionMatrix(actuals = complete.data$is_loyal,  predictedScores = predict.prob, threshold = optCutoff)
+```
+
+```{r}
+misClassError(actuals = complete.data$is_loyal,  predictedScores = predict.prob, threshold = optCutoff)
+```
+
+```{r}
+#604/(604+72) = 0.8935
+precision(actuals = complete.data$is_loyal,  predictedScores = predict.prob, threshold = optCutoff)
+```
+
+
+```{r}
+#(297)/(297+72)=0.8048
+specificity(actuals = complete.data$is_loyal,  predictedScores = predict.prob, threshold = optCutoff)
+```
+
+```{r}
+#604/(604+27) = 0.9572
+sensitivity(actuals = complete.data$is_loyal, predictedScores = predict.prob, threshold = optCutoff)
+```
+
+
+3. 請繪製 final.model 的 ROC 曲線，並計算其 AUC 。
+
+> 這邊遇到一個小問題，就是How to create a tibble directly from data？，看起來用`as_tibble()`沒有辦法，講師是用`data.frame()`，那如果要直接產生一個tibble的話，
+建議使用`data_frame`
+
+```{r}
+#we need to creat a small table to put `is_loyal` and `predict.prob` together. Or, the aes may not detect them
+#The 'data_frame()' function acts in a similar way to 'data.frame()', except that it returns a 'tibble'.
+
+
+roctable <- data_frame(
+  loyality = complete.data$is_loyal,
+  prob = predict.prob
+)
+
+
+#m for continuous predictor, d for binary outcome
+roc.graph <- roctable %>% ggplot(., aes(m=prob, d=loyality)) + 
+  geom_roc(n.cuts = 3, labelround = 3, labelsize = 3) 
+
+roc.graph + annotate(geom = "text", x=0.75, y=0.25 ,label=paste0("AUC=", round(calc_auc(roc.graph)$AUC,3))) + style_roc(xlab="1-Specificity", ylab="Sensitivity")
+
+```
+
+
+## 題目二
+
+1. 請繪製 final.model 中各個係數的 bar chart。
+
+```{r}
+coefficient.table <- data_frame(
+  Variable = names(final.model$coefficients),
+  Coefficient = final.model$coefficients
+)
+
+coefficient.table <- coefficient.table[2:14,] %>% arrange(Coefficient)
+
+coefficient.table$Variable <- factor(coefficient.table$Variable, levels = coefficient.table$Variable)
+
+coefficient.table
+```
+
+```{r}
+coefficient.table %>% ggplot(data = ., aes(x=Variable, y=Coefficient)) +
+  geom_bar(aes(fill = Variable), stat = "identity") + coord_flip() + 
+  labs(x="Factors", 
+       y="Impact on customer loyality",
+       title="The comparison of different factors to the customer loyality") +
+  guides(fill = "none") +
+  theme_bw(base_size = 10)
+```
+
+根據邏輯迴歸模型預測的機率，繪製出 is_loyal = 0 與 is_loyal = 1 其預測機率 density plot。（建議參考 A/B 測試的個案）
+
+> 就是兩條density plot，用不同顏色，看看預測模型有沒有把他們分得很開。
+
+```{r}
+predict.prob
+optCutoff
+
+predict.prob.table <- data_frame(
+  predict.probability = predict.prob
+)
+
+predict.prob.table <- predict.prob.table %>% mutate(
+  Classfication.Result = ifelse(predict.probability>optCutoff, 1,0)
+)
+
+predict.prob.table$Classfication.Result <-  as.factor(predict.prob.table$Classfication.Result)
+
+predict.prob.table
+```
+
+```{r}
+
+predict.prob.table %>% ggplot(data = ., aes(x=predict.probability, 
+                                            fill=Classfication.Result, 
+                                            color=Classfication.Result)) + 
+                       geom_density(alpha=0.3) + #density的y軸是機率密度函數（kernel base)在該點值帶入所得到的，也不是累積機率。
+                       labs(title="the Density plot of the predicted probability")
+```
+
+
+
+
