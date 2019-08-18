@@ -62,3 +62,6 @@ test2 %>% class() ##"tbl_df"     "tbl"        "data.frame"
 link function，基本上就是針對（被解釋變數）為非連續的狀況，利用一些轉換方式讓他變成連續的（continuous），如此伊來就可以用（解釋變數）進行線係估計。他是GLM（Generl Linear Model）精神的產物之一。
 
 Logistic裡面的link function是logOdd，這是一個GLM的specific case。那也有別種link function的形式，像是log-log等，甚至也可以不只用在Binomial distribution，也可以用在Poisson等。
+
+一言以敝之就是：Link functions elegantly solve the
+problem of using linear models with with non-normal data
