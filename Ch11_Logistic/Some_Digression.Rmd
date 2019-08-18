@@ -65,3 +65,9 @@ Logistic裡面的link function是logOdd，這是一個GLM的specific case。那�
 
 一言以敝之就是：Link functions elegantly solve the
 problem of using linear models with with non-normal data
+
+### 推導迴歸模型下，（估計值f_i）與（實際值y_i）的相關係數之平方，會等於R square
+
+[這篇真的很棒](http://danshiebler.com/2017-06-25-metrics/)
+
+建議從correlation 推導到R^2。去蕪存菁把要的部分弄出來，不要的部分全部展開會消掉=0
