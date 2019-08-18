@@ -90,6 +90,7 @@ GameTableResult2[1:6] %>% kmeans(x=., centers = 3) -> KCluster2
 ```
 
 ```{r 檢視Kmeans分群結果}
+set.seed(500)
 KCluster2
 ```
 
@@ -97,6 +98,7 @@ KCluster2
 3. 將 __下午的遊玩時間__和 __購買金幣金額__還原至完整資料集中的真實值(非標準化後的數字)，並計算第一群在這兩個特徵的中位數(Median)。
 
 ```{r 將分群結果貼回原始資料集} 
+set.seed(500)
 GameTable2 %>% cbind(., KCluster2$cluster) %>% 
   rename(Cluster = 'KCluster2$cluster') -> GameTableFinal2
 GameTableFinal2 ##將分群結果貼回原始資料集
@@ -106,6 +108,7 @@ GameTableFinal2 ##將分群結果貼回原始資料集
 
 以下這兩個程式，跑出來的median為什麼會不一樣？
 ```{r 老師的解答}
+set.seed(500)
 GameTableFinal2 %>% filter(Cluster == 1) %>%
   summarise(
     Min_Aft_median = median(Aft*(max(Min_Aft)-min(Min_Aft)) + min(Min_Aft)),
@@ -114,6 +117,7 @@ GameTableFinal2 %>% filter(Cluster == 1) %>%
 ```
 
 ```{r 直接取median}
+set.seed(500)
 GameTableFinal2 %>% filter(Cluster == 1) %>%
   summarise(
     Min_Aft_median = median(Min_Aft),

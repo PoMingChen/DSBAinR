@@ -26,4 +26,39 @@ join is a plyr function. dplyr has inner_join, left_join, semi_join and anti_joi
 * tells you what keys you're merging by (if you don't supply)
 * also work with database tables.
 
+### 為什麼利用`class()`函數查詢`tibble`物件資料型態，反而回傳了三個東西（合理期待是"tibble"而已）；而且同時也包含了data.frame。
 
+這是個很好的問題！這其實是物件導向 (object-oriented) 程式設計的觀念，tibble 其實是一個叫做 tbl_df 的類別 (class)，繼承 (inherit) 了 tbl 這個類別的性質。同時 tbl 其實繼承了 Base R 中的 data.frame 類別 (class)。
+
+> 所以tbl_df是最小的subset，再來是tbl，最大是data.frame這個母類別（是屬於Base R）
+
+換個比較好懂的例子，你可以想像車是一個很大的 class，要有很多性質，比如說：要有輪子、要有駕駛座等等，跑車是車的子類別 (sub-class)，繼承了要有輪子、駕駛座等的性質，但也有很多他自己的性質。卡車也是車的子類別，除了繼承了車子的屬性之外，也有自己特定的屬性。
+
+在 R 語言中，每一個類別都會有類別屬性 (class attribute)，告訴你他是什麼樣的類別，繼承自哪個母類別，而 class() 函數就是幫我們其實就是 print 出一個類別的類別屬性而已。
+
+```{r}
+test <- data.frame(
+  A = c(1:3),
+  B = c(4:6)
+)
+
+test %>% class() ##"data.frame"
+```
+
+```{r}
+test2 <- data_frame( ##注意是一個底線
+  A = c(1:3),
+  B = c(4:6)
+)
+
+test2 %>% class() ##"tbl_df"     "tbl"        "data.frame"
+```
+
+### What is a link function?
+
+[這篇算滿簡潔的，也給了一些不同形態問題的link function的參考](https://support.minitab.com/en-us/minitab/18/help-and-how-to/modeling-statistics/regression/supporting-topics/logistic-regression/link-function/)
+
+
+link function，基本上就是針對（被解釋變數）為非連續的狀況，利用一些轉換方式讓他變成連續的（continuous），如此伊來就可以用（解釋變數）進行線係估計。他是GLM（Generl Linear Model）精神的產物之一。
+
+Logistic裡面的link function是logOdd，這是一個GLM的specific case。那也有別種link function的形式，像是log-log等，甚至也可以不只用在Binomial distribution，也可以用在Poisson等。

@@ -141,6 +141,13 @@ roctable <- data_frame(
   prob = predict.prob
 )
 
+roctable %>% class()
+
+test <- data.frame(
+  A = c(1:3),
+  B = c(4:6)
+)
+test %>% class()
 
 #m for continuous predictor, d for binary outcome
 roc.graph <- roctable %>% ggplot(., aes(m=prob, d=loyality)) + 
