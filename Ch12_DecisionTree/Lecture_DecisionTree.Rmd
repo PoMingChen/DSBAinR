@@ -9,22 +9,208 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Env Setting
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library("tidyverse")
+library("plotROC")
+library("rpart")
+library("magrittr")
+library("rpart.plot")
 ```
 
-## Including Plots
+## 航空業的顧客忠誠度問題- 分類決策樹模型
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+internal.data <- read_csv("./航空業分析資料集/internal_data.csv")
+survey.data <- read_csv("./航空業分析資料集/survey_data.csv")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+internal.data %>% head()
+survey.data %>% head()
+```
+
+```{r}
+internal.data$credit_card_vendor <- as.factor(internal.data$credit_card_vendor)
+internal.data$credit_card_bonus <- as.factor(internal.data$credit_card_bonus)
+```
+
+```{r}
+survey.data$register_method <- as.factor(survey.data$register_method)
+```
+
+```{r}
+internal.data %>% head()
+survey.data %>% head()
+```
+
+```{r}
+complete.data <- internal.data %>% merge(x=., y=survey.data, by = "user_id")
+```
+
+```{r}
+complete.data %<>% select(user_id, is_loyal, everything())
+```
+
+```{r}
+complete.data$is_loyal <- ifelse(complete.data$is_loyal == 1, 'Satisfied', 'Unsatisfied')
+```
+
+```{r}
+complete.data
+```
+
+
+### 只考量「行銷因素」的分類模型
+
+先用行銷因素建立簡單的決策樹模型，說明模型背後運作的邏輯
+
+我們使用`rpart`套件中的`rpart()`函數進行決策樹分析，其中重要的參數有：
+
+formula: Y ~ X1 + X2
+data: 資料集合名稱
+split: 選擇使 __用gini(吉尼不純度)__或 __information(熵)__，預設為gini。
+
+```{r}
+internal.data %>% colnames()
+```
+
+```{r}
+survey.data %>%
+  colnames()
+```
+
+
+```{r}
+marketing.model <- rpart(is_loyal ~ dm_message + dm_post + dm_email +  credit_card_vendor + credit_card_bonus + 
+                           tv_ad + youtube_ad_1 + youtube_ad_2 + youtube_ad_3, 
+                         data = complete.data)
+```
+
+接著載入`rpart.plot套件`，利用`rpart.plot`呈現決策樹分析的視覺化
+
+> 記得表格內，第二個是分類機率（預測為類別1的機率）。而這邊的1，是unsatisifed，0則是代表satisified。（和原本資料的設定恰好相反，需要多注意）
+
+分類機率，跟Logistics的預測出來的條件機率很像。當你的機率越高，就會越接近類別1，反之為類別0。
+
+```{r}
+rpart.plot(marketing.model)
+```
+
+### 直接建立包含「行銷活動」與「服務品質」的完整分類模型
+
+將所有變數納入考慮，建立決策樹模型。
+
+> 這邊沒有用到coupon這個變數？
+
+```{r}
+full.model <- rpart(is_loyal ~ depart_on_time + arrive_on_time +
+                      register_method + register_rate +
+                      class + seat_rate + meal_rate +
+                      flight_rate + package_rate +
+                      dm_message + dm_post + dm_email +
+                      credit_card_vendor + credit_card_bonus +
+                      tv_ad + youtube_ad_1 + youtube_ad_2 + youtube_ad_3,
+                    data = complete.data)
+```
+
+同樣將模型視覺化，幫助我們了解模型判斷的邏輯。
+
+```{r}
+rpart.plot(full.model)
+```
+
+接著同樣使用plotROC套件，以AUC作為指標，衡量模型分類表現
+```{r}
+predict.prob <- predict(full.model, complete.data)[,2] #first col: satisifed, second col. : Unsatisfied.
+
+#這邊需要注意，因為決策樹模型裡面：0，是satisfied，1，是unsatisifed。因此這邊prediction，就必須要注意你到底是要預測他是：Satisfied，或者Unsatisfied。
+```
+
+```{r}
+predict.table <- data_frame(true_label = complete.data$is_loyal,
+                            predict_prob = predict.prob)
+```
+
+```{r}
+predict.table
+```
+
+```{r}
+basic.plot <- ggplot(predict.table, aes(d = true_label, m = predict.prob)) +
+  geom_roc(n.cuts = 3, labelsize = 3, labelround = 2)
+basic.plot + style_roc() +
+  annotate("text", x = .75, y = .25, size = 5,
+           label = paste("AUC =", round(calc_auc(basic.plot)$AUC, 3)))
+
+#D not labeled 0/1, assuming Satisfied = 0 and Unsatisfied = 1!
+
+#D means d = true_label. 1 = do satisifed, 0 = not satisified in original. But, the DecisionTree model have Satisfied = 0, and Unsatisifed = 1. The ROC modeling has the same assumption with DecisionTree model. That's good.
+```
+
+### 決策樹剪枝
+
+決策樹能掌握資料中最枝尾末節的邏輯與關聯，建立完整的分類模型；但這樣的結果是容易遇到過度擬合(over-fitting)的問題，也難以讓決策者理解，因此必須進行剪枝。在`rpart()`中，我們可以透過參數`cp(complexity parameter)` 進行剪枝；也可以使用split中調整分類的判斷指標。
+
+```{r}
+tune.model <- rpart(is_loyal ~ depart_on_time + arrive_on_time +
+                      register_method + register_rate +
+                      class + seat_rate + meal_rate +
+                      flight_rate + package_rate +
+                      dm_message + dm_post + dm_email +
+                      credit_card_vendor + credit_card_bonus +
+                      tv_ad + youtube_ad_1 + youtube_ad_2 + youtube_ad_3,
+                    data = complete.data,
+                    cp = 0.03, #complex parameter. #cp = 0.01 is default.
+                    #調高的話，就是拉高開枝散葉的門檻
+                    parms = list(split='information')) #split = 'Gini' is default. Now, change the split='information' to be Entropy.
+
+rpart.plot(tune.model)
+```
+
+接著同樣使用`plotROC`套件，以AUC (Area under Curve)作為指標，衡量模型分類表現
+```{r}
+predict.prob <- predict(tune.model, complete.data)[,2]
+
+
+predict.table <- data_frame(true_label = complete.data$is_loyal,
+                            predict_prob = predict.prob)
+
+
+basic.plot <- ggplot(predict.table, aes(d = true_label, m = predict.prob)) +
+  geom_roc(n.cuts = 3, labelsize = 3, labelround = 2)
+
+basic.plot + style_roc() +
+  annotate("text", x = .75, y = .25, size = 5,
+           label = paste("AUC =", round(calc_auc(basic.plot)$AUC, 3)))
+```
+
+從決策樹的源頭到各個分叉的判斷中，我們可以得出以下結論：
+
+> 一共用到五個先後順序的分類。
+
+- 整體而言，`seat_rate >= 3`滿意度是最重要的決定因素
+- `dm_message`會造成反感，需要特別注意此狀況
+- 有沒有成功接收到電視廣告`tv_ad`的資訊，對於滿意度也有較大的影響
+- 信用卡紅利(credit_card_bonus)和餐點評分(meal_rate)也是最終影響滿意度的因素
+
+```{r}
+rpart.plot(tune.model)
+```
+
+-----
+
+## 餐飲業的營收預測和分析- 預測決策樹模型
+
+## Env Setting
+```{r}
+SalesData <- read_csv("./餐飲業分析資料集/Restaurant_Sales_Renew.csv")
+```
+
+```{r}
+
+```
+
+
+
