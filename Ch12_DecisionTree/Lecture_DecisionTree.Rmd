@@ -125,6 +125,8 @@ rpart.plot(full.model)
 ```{r}
 predict.prob <- predict(full.model, complete.data)[,2] #first col: satisifed, second col. : Unsatisfied.
 
+#這邊`predict()`，如果是0,1就要考慮是預測0 or 1。可是如果是數值變數，就不會有兩個column，就只有一個預測值。
+
 #這邊需要注意，因為決策樹模型裡面：0，是satisfied，1，是unsatisifed。因此這邊prediction，就必須要注意你到底是要預測他是：Satisfied，或者Unsatisfied。
 ```
 
@@ -209,8 +211,111 @@ SalesData <- read_csv("./餐飲業分析資料集/Restaurant_Sales_Renew.csv")
 ```
 
 ```{r}
-
+SalesData %>% colnames()
 ```
 
+### 依照區域分別建立模型
 
+- 區域A的迴歸樹模型
+
+> 同一個節點的資料，因為符合相同的判定條件，會有相同的預測值。
+
+```{r}
+SalesDataA <- SalesData %>% filter(Region %in% 'A')
+Model.A.All <- rpart( Sales ~ ., 
+                      data = SalesDataA[,-c(1,2)])
+
+rpart.plot(Model.A.All)
+```
+
+- 區域B的迴歸樹模型
+
+```{r}
+SalesDataB <- SalesData %>% filter( Region %in% 'B')
+Model.B.All <- rpart( Sales ~ ., 
+                      data = SalesDataB[,-c(1,2,4)])
+
+rpart.plot(Model.B.All)
+```
+
+### 衡量預測成果
+
+- 誤差：以`RMSE`衡量
+
+```{r}
+RMSE <- function(predict, actual){
+  result <- sqrt(mean((predict - actual) ^ 2))
+}
+
+cat('RegionA模型的RMSE：\n',RMSE(predict(Model.A.All, SalesDataA), SalesDataA$Sales),'\n',sep = '')
+```
+
+```{r}
+cat('RegionB模型的RMSE：\n', RMSE(predict(Model.B.All, SalesDataB), SalesDataB$Sales),'\n',sep ='')
+```
+
+- 誤差：以`MAPE`衡量
+
+```{r}
+MAPE <- function(predict, actual){
+  result <- mean(abs((predict - actual)/actual)) %>% round(3) * 100
+}
+
+cat('RegionA模型的MAPE：\n',MAPE(predict(Model.A.All, SalesDataA), SalesDataA$Sales),'%','\n', sep='')
+```
+
+```{r}
+cat('RegionB模型的MAPE：\n', MAPE(predict(Model.B.All, SalesDataB), SalesDataB$Sales),'%','\n',sep='')
+```
+
+### 決策樹剪枝
+
+以區域B的模型為例進行剪枝。這邊只有區域B，所以結論商業建議只有區域B
+
+> 這兩個模型都結果都一樣，後者 `SalesDataB[,-c(1,2)]`會有點跟`Sales ~ .`混淆，畢竟後者是有把所有的變數納入，包含Weekday分析。
+
+```{r}
+Model.B.Tune <- rpart(Sales ~ ., 
+                      data = SalesDataB[,-c(1,2)],
+                      cp = 0.005) #調低，允許更容易開枝散葉
+
+rpart.plot(Model.B.Tune)
+```
+
+```{r}
+Model.B.Tune <- rpart( Sales ~ ., 
+                      data = SalesDataB, 
+                      cp = 0.005)
+
+rpart.plot(Model.B.Tune)
+```
+
+```{r}
+RMSE <- function( predict, actual){
+  result <- sqrt(mean((predict - actual) ^ 2))
+}
+
+cat('RegionB模型的RMSE：\n',RMSE(predict(Model.B.Tune, SalesDataB), SalesDataB$Sales),'\n',sep = '')
+```
+
+```{r}
+MAPE <- function( predict, actual){
+  result <- mean(abs((predict - actual)/actual)) %>% round(3) * 100
+}
+
+cat('RegionB模型的MAPE：\n',MAPE(predict(Model.B.Tune, SalesDataB), SalesDataB$Sales),'%','\n',sep='') #\n就是直接一個斷行
+```
+
+### 利用完整的決策樹提出餐飲業的商業策略建議
+
+對於區域B而言，一個門市的營業額受到以下因素影響：
+
+- 整體而言`門市類型`是此區域最重要的營收影響因素
+- 對於`店2`來說，百貨公司的特別活動是最重要的影響因素
+- 對於區域B的門市而言，月份淡旺季的影響比平假日來得重要，人力和物料等資源的部屬，應優先考慮淡旺季的差別。(因為就樹的等級，淡旺季的影響就是在淡旺季上面。)
+
+```{r}
+SalesDataB #包含Store_Name 2 3
+rpart.plot(Model.B.Tune)
+```
 
