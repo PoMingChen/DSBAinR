@@ -173,7 +173,7 @@ predict.prob.table.ROCgraph + style_roc(xlab = "1-Specificity", ylab = "sensitiv
 
 想要挖掘更多的內容，所以希望可以讓決策樹開枝散葉，用`cp=0.005`試看看
 
-後來我們發現`cp=0.005`的決策樹與一開始的`cp=0.01`並無不同。當`cp=0.04`才出現改變，但最終AUC = 0.769 > 0.764。顯示出目前的分類樹模型已經相當穩定，給stakeholder的建議可以集中在座艙的舒適度提升，以及航班的準點，就可以獲得相當多客戶青睞。
+後來我們發現`cp=0.005`的決策樹與一開始的`cp=0.01`並無不同。當`cp=0.004`才出現改變，但最終AUC = 0.769 > 0.764。顯示出目前的分類樹模型已經相當穩定，給stakeholder的建議可以集中在座艙的舒適度提升，以及航班的準點，就可以獲得相當多客戶青睞。
 
 ```{r}
 rpart.plot(survey.model)
@@ -310,7 +310,6 @@ rpart.plot(tune.Model.A)
 
 ```{r}
 tune.pred.sales <- predict(tune.Model.A, sales.data.renew.A)
-tune.pred.sales
 ```
 
 ```{r}
