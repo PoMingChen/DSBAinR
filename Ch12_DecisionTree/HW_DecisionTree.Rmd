@@ -46,7 +46,7 @@ survey.data %>% colnames()
 
 
 ```{r}
-sales.data.new <- read_csv("./餐飲業分析資料集/Restaurant_Sales_Renew.csv", locale = locale(encoding = "UTF-8"))
+sales.data.renew <- read_csv("./餐飲業分析資料集/Restaurant_Sales_Renew.csv", locale = locale(encoding = "UTF-8"))
 ```
 
 #### kind reminder
@@ -89,20 +89,9 @@ complete.data %>% head()
 complete.data %>% colnames()
 ```
 
-
 ```{r}
 complete.data %<>% select(1,8,everything())
 ```
-
-```{r}
-survey.data
-```
-
-```{r}
-complete.data
-```
-
-
 
 #### 進入題目
 
@@ -132,7 +121,6 @@ rpart.plot(survey.model)
 ```{r}
 #object, a **model object** for which prediction is desired. (所以前面必定是放你設計的model，不定參數放你original 的data)
 predict.prob <- predict(object = survey.model, survey.data)[,2] 
-predict.prob[1:6]
 ```
 
 ```{r Use survey.model and complete. data}
@@ -146,11 +134,11 @@ predict.prob.table %>% head()
 ```{r Use survey.model and complete.data}
 #Bad example, but good concept review.
 
-#The prediction of complete.data into survey.model is really bad. It's simple to understand it through the LogOdd linear regression on the variables. With only few variable(X_1~X_i not to X_j), that's not really fit.
+#The prediction of complete.data into survey.model is really bad. It's simple to understand it through the LogOdd linear regression on the variables. With only few variable(X_1~X_i not to X_j), that's not really fitted.
 
 predict.prob.table.test <- tibble(
     true_label = survey.data$is_loyal,
-    predict.prob.of.Unsatisified = predict(object = survey.model,   complete.data)[,2] 
+    predict.prob.of.Unsatisified = predict(object = survey.model, complete.data)[,2] 
 )
 
 predict.prob.table.test %>% head()
@@ -181,11 +169,11 @@ predict.prob.table.ROCgraph + style_roc(xlab = "1-Specificity", ylab = "sensitiv
 
 只考慮「服務品質」的模型，一共用了九個變數。目前看起來顧客最在意航班的舒適度（是否能夠充分休息，或至少不消耗精神），接來是準時與否也是重要的。甚至就算`seat_rate>=3`沒有被滿足，後續的`arrive_on_time=1`若顧客的航班是準點，以及`seat_rate>=2`，最終也一樣顧客會對我們有忠誠度。
 
-因此我們甚至可以說，`seat_rate`和`"Be"_on_time`這兩個條件可以說絕對不可失分的兩個因素。本質上顧客最在意航班這個交通方式是否是個「放心與簡單放鬆，勝過於追求過程中的享受」的選擇，何況`meal_rate>4`算是一個高門檻，消費者必須要覺得很好吃才有可能變得忠誠。何況他還是次要因素。
+因此我們甚至可以說，`seat_rate`和`"Be"_on_time`這兩個條件可以說絕對不可失分的兩個因素。本質上顧客最在意航班這個交通方式是否是個「放心與能夠休息，勝過於追求過程中的享受」的交通選擇，何況`meal_rate>4`算是一個高門檻，消費者必須要覺得很好吃才有可能變得忠誠。何況他還只是次要因素。
 
-想要挖掘更多的內容，所以希望可以讓決策樹開枝散葉，用`cp=0.05`試看看
+想要挖掘更多的內容，所以希望可以讓決策樹開枝散葉，用`cp=0.005`試看看
 
-後來我們發現`cp=0.05`的決策樹與一開始的`cp=0.1`並無不同。當`cp=0.04`才出現改變，但最終AUC = 0.769 > 0.764。顯示出目前的分類樹模型已經相當穩定，給stakeholder的建議就是集中在座艙的舒適度提升，以及航班的準點，就可以獲得相當多客戶青睞。
+後來我們發現`cp=0.005`的決策樹與一開始的`cp=0.01`並無不同。當`cp=0.04`才出現改變，但最終AUC = 0.769 > 0.764。顯示出目前的分類樹模型已經相當穩定，給stakeholder的建議可以集中在座艙的舒適度提升，以及航班的準點，就可以獲得相當多客戶青睞。
 
 ```{r}
 rpart.plot(survey.model)
@@ -213,7 +201,6 @@ rpart.plot(survey.tune.model)
 ```{r}
 #object, a **model object** for which prediction is desired. (所以前面必定是放你設計的model，不定參數放你original 的data)
 predict.tune.prob <- predict(object = survey.tune.model, survey.data)[,2] 
-predict.prob[1:6]
 ```
 
 ```{r Use survey.model and complete. data}
@@ -221,9 +208,7 @@ predict.tune.prob.table <- tibble(
   true_label = survey.data$is_loyal,
   predict.tune.prob.of.Unsatisified = predict(object = survey.tune.model, survey.data)[,2] 
 )
-predict.tune.prob.table %>% head()
 ``` 
-
 
 ```{r}
 predict.tune.prob.table %>% ggplot(data =., aes(d=true_label, m=predict.tune.prob.of.Unsatisified)) + geom_roc(n.cuts = 3, labelsize = 3, labelround = 2) -> predict.tune.prob.table.ROCgraph
@@ -244,11 +229,91 @@ predict.tune.prob.table.ROCgraph + style_roc(xlab = "1-Specificity", ylab = "sen
 
 1. 建立僅包含RegionA的資料集
 
-```{r}
+> RegionA，包含Store1 4
 
+```{r}
+sales.data.renew %>% filter(Region %in% "A") -> sales.data.renew.A
 ```
 
+```{r}
+sales.data.renew.A %>%
+  colnames()
+```
 
 2. 決策樹分析：建立CART迴歸樹模型，並利用MAPE衡量分類結果。
+
+```{r}
+Model.A <- rpart(Sales ~ .,
+                 data = sales.data.renew.A, 
+                 cp = 0.005,
+                 parms = list("Information"))
+```
+
+```{r}
+rpart.plot(Model.A)
+```
+
+```{r}
+#MAPE, mean absolute percentage error
+MAPE.function <- function(prediction, actual) {
+  mean(abs((prediction-actual)/actual)) -> decimal
+  decimal %<>% round(., digits = 4)
+  paste0(as.character(decimal*100), "%") -> MAPE
+  print(MAPE)
+}
+```
+
+```{r}
+pred.sales <- predict(Model.A, sales.data.renew.A)
+pred.sales
+```
+
+```{r}
+cat("Model.A MAPE: \n", MAPE.function(pred.sales, sales.data.renew.A$Sales), sep = "")
+```
+
 3. 決策樹視覺化：試著從視覺化結果提出決策建議，可以自行決定剪枝，以提供更好的洞見。
+
+RegionA本身是觀光區，包含了Store1, Store4。店面類型（Type）主要包含`百貨門市AA Store1`，以及`獨立門市BB Store4`。
+
+1. 影響營收最大的因素在於`店面類型`，很明顯地是`百貨門市`的話，預估營收會比`獨立門市`高。
+2. 第二重要影響營收的因素則是`Weekday`，平日或者假日。很明顯地是`假日`的時候預估營收會比`平日`來得高。
+3. 第三重要影響因素則是淡旺季的月份
+
+- Store1本身`TypeBB = No`，他是百貨門市。淡季主要是三、四、六、八、十一月
+- Store4本身`TypeBB = Yes`，他是獨立門市。淡季主要是二、三、四、五、六、九、十、十一月
+
+若我是店長，我應該會想要知道，關於影響Store1, Store4，除了`店面類型`，`平假日`，`淡旺季`因素以外（因為這三項其實滿僵固的，不見得是我一位店長就能夠改變什麼的，今天若就是假日，資源準備多一點是做生意的基本），有哪些更細微屬於該店面特殊的影響因素，是我可以控制或者因應的呢？
+
+所以商業問題，這時候會想要將決策樹開枝散葉，看看更細微的影響因素。
+
+```{r}
+rpart.plot(Model.A)
+```
+
+那將`cp = 0.005`調整為`cp = 0.004`則會發現屬於百貨門市的 __Store1__，其`Store_Event`的影響力也被凸顯出來。反而獨立門市的 __Store4__決策樹分支一直很穩定，直到`cp=0.0025`時候才會在分叉，但是已經有出現Over-fitting的問題。因此不予考慮。
+
+當決策樹模型調整為`cp = 0.004`，MAPE = 7.67% < 8.28 in `cp = 0.005`，模型預測效率有再改善一些。
+
+所以若是RegionA這兩家店的店長，除了`店面類型`，`平假日`，`淡旺季`因素以外，我也會多加留意Store1的週年慶期間，店內的人力物力資源配置。
+
+```{r}
+tune.Model.A <- rpart(Sales ~ .,
+                      data = sales.data.renew.A,
+                      cp = 0.004,
+                      parms = list("Information"))
+```
+
+```{r}
+rpart.plot(tune.Model.A)
+```
+
+```{r}
+tune.pred.sales <- predict(tune.Model.A, sales.data.renew.A)
+tune.pred.sales
+```
+
+```{r}
+cat("Model.A MAPE: \n", MAPE.function(tune.pred.sales, sales.data.renew.A$Sales), sep = "")
+```
 
