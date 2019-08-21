@@ -1,0 +1,187 @@
+---
+title: "HW_DecisionTree"
+author: "PoMingChen"
+date: "8/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 說明
+
+在這個章節的作業中，我們同樣使用「航空顧客忠誠度」及「餐飲營收預測」的資料集實作決策樹分析，完成個案中尚未嘗試的模型，並提供適當的決策建議。
+
+## 注意事項
+
+- 設置工作路徑，並確定兩個資料集合都放置在你的工作路徑：
+
+- 讀成data.frame
+`read.csv('檔案名稱', encoding = 'UTF-8')`
+- 讀成tibble
+`read_csv('檔案名稱', locale= locale(encoding='UTF-8'))`
+
+## Env Setting 
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(plotROC)
+library(rpart)
+library(rpart.plot)
+```
+
+
+```{r}
+internal.data <- read_csv("./航空業分析資料集/internal_data.csv", locale = locale(encoding = "UTF-8"))
+
+survey.data <- read_csv("./航空業分析資料集/survey_data.csv", locale = locale(encoding = "UTF-8"))
+```
+
+```{r}
+internal.data %>% colnames()
+survey.data %>% colnames()
+```
+
+
+```{r}
+sales.data.new <- read_csv("./餐飲業分析資料集/Restaurant_Sales_Renew.csv", locale = locale(encoding = "UTF-8"))
+```
+
+#### kind reminder
+
+在決策樹模型裡面，一共有分類樹以及數值樹兩種方式。
+
+分類樹與Logistic比較接近，因此若原始資料正確，其實模型可以疏途同歸，但是衡量模型良窳的方式就必須一致，使用ROC Curve and AUC, Area under the curve.
+
+數值樹與LM比較接近，因此若原始資料正確，其實模型可以疏途同歸，但是衡量模型良窳的方式就必須一致，使用RMSE, Root mean square error，或者是MAPE, mean absolute value percentage error.
+
+## 題目一
+
+#### Data Transformation
+
+```{r}
+internal.data %>% colnames()
+```
+
+```{r}
+internal.data$credit_card_vendor <- as.factor(internal.data$credit_card_vendor)
+internal.data$credit_card_bonus <- as.factor(internal.data$credit_card_bonus)
+```
+
+```{r}
+survey.data %>% colnames()
+```
+
+```{r}
+survey.data$register_method <- as.factor(survey.data$register_method)
+survey.data$class <- as.factor(survey.data$class)
+survey.data$is_loyal <- ifelse(survey.data$is_loyal==1, "Satisified", "Unsatisified")
+```
+
+```{r}
+complete.data <- internal.data %>% merge(x=., y=survey.data, by = "user_id")
+```
+
+```{r}
+complete.data %>% head()
+complete.data %>% colnames()
+```
+
+
+```{r}
+complete.data %<>% select(1,8,everything())
+```
+
+```{r}
+survey.data
+```
+
+```{r}
+complete.data
+```
+
+
+
+#### 進入題目
+
+1. 建立僅包含「服務品質」的資料集：共有depart_on_time、arrive_on_time、register_method、register_rate、class、seat_rate、meal_rate、flight_rate、package_rate等變數。
+
+```{r}
+survey.model <- rpart(is_loyal~depart_on_time+
+                               arrive_on_time+
+                               register_method+
+                               register_rate+
+                               class+
+                               seat_rate+
+                               meal_rate+
+                               flight_rate+
+                               package_rate,
+                               data = survey.data,
+                               cp = 0.01, #cp = 0.01 is the default
+                               parms = list(split='information')) #The splitting index can be gini or information. The default priors are proportional to the data counts, the losses default to 1, and the split defaults to gini.
+```
+
+2. 決策樹分析：建立CART分類樹模型，並使用Entropy當作分類指標，並計算AUC。
+
+```{r}
+rpart.plot(survey.model)
+```
+
+```{r}
+#object, a **model object** for which prediction is desired. (所以前面必定是放你設計的model，不定參數放你original 的data)
+predict.prob <- predict(object = survey.model, survey.data)[,2] 
+predict.prob[1:6]
+```
+
+```{r Use survey.model and complete. data}
+predict.prob.table <- tibble(
+  true_label = survey.data$is_loyal,
+  predict.prob.of.Unsatisified = predict(object = survey.model, survey.data)[,2] 
+)
+predict.prob.table %>% head()
+``` 
+
+
+```{r Use survey.model and complete.data}
+#Bad example, but good concept review.
+
+#The prediction of complete.data into survey.model is really bad. It's simple to understand it through the LogOdd linear regression on the variables. With only few variable(X_1~X_i not to X_j), that's not really fit.
+
+predict.prob.table.test <- tibble(
+    true_label = survey.data$is_loyal,
+    predict.prob.of.Unsatisified = predict(object = survey.model,   complete.data)[,2] 
+)
+
+predict.prob.table.test %>% head()
+```
+
+```{r}
+predict.prob.table %>% ggplot(data =., aes(d=true_label, m=predict.prob.of.Unsatisified)) + geom_roc(n.cuts = 3, labelsize = 3, labelround = 2) -> predict.prob.table.ROCgraph
+```
+
+```{r}
+predict.prob.table.ROCgraph + style_roc(xlab = "1-Specificity", ylab = "sensitivity") + annotate(geom = "text",                                                              x=0.75, 
+                          y=0.25,
+                          label = paste0("AUC=", as.character(
+                          round(calc_auc(predict.prob.table.ROCgraph
+                                                 )$AUC, digits = 3)
+                          ))
+                                        )
+```
+
+
+3. 決策樹視覺化：試著從視覺化結果提出決策建議，可以自行決定剪枝，以提供更好的洞見。
+
+```{r}
+rpart.plot(survey.model)
+```
+
+
+## 題目二
+
+1. 建立僅包含RegionA的資料集
+2. 決策樹分析：建立CART迴歸樹模型，並利用MAPE衡量分類結果。
+3. 決策樹視覺化：試著從視覺化結果提出決策建議，可以自行決定剪枝，以提供更好的洞見。
+
